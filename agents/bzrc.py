@@ -349,7 +349,7 @@ class BZRC:
         """Request a list of obstacles."""
         self.sendline('obstacles')
         self.read_ack()
-        return self.rea0d_obstacles()
+        return self.read_obstacles()
 
     def get_occgrid(self, tankid):
         """Request an occupancy grid for a tank"""
