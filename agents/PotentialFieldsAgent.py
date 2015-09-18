@@ -18,8 +18,12 @@ class PotentialFieldsAgent(object):
 		self.prev_angle_error = 0
 		self.angle_P = 5
 		self.angle_D = 5
+		self.obstacle_repulse_factor = 8
+		self.goal_attr_factor = 10
+		self.obstacle_radius_extension = 50
+		self.obstacle_outer_radius = 250
 
-		self.get_obstacles()
+		self.process_obstacles()
 
 	def tick(self, time_diff):
 		"""Some time has passed; decide what to do next."""
@@ -39,23 +43,33 @@ class PotentialFieldsAgent(object):
 	def calculate_potential_fields(self, tank, time_diff):
 
 		vec = self.get_goal_vector(tank)
+		print "goal vector: ", vec
+
 		ob_vec = self.calc_obstacles_vector(tank)
 		vec[0] += ob_vec[0]
 		vec[1] += ob_vec[1]
+
+		tan_vec = self.calc_tangential_vector(tank)
+		vec[0] += tan_vec[0]
+		vec[1] += tan_vec[1]
+
+		print "obstacle vector: ", ob_vec
+		print "tangent vector: ", tan_vec
+		print "combined vector: ", vec
 		#print vec
 		target_angle = math.atan2(vec[1], vec[0])
 		angle_error = target_angle - tank.angle
 		if self.prev_angle_error == 0:
 			self.prev_angle_error = angle_error
 		relative_angle = self.normalize_angle(angle_error)
-		print time_diff
+		#print time_diff
 		angle_velocity = 0
 		if time_diff != 0:
 			angle_velocity = self.angle_P * relative_angle + \
 				self.angle_D * self.normalize_angle((angle_error - self.prev_angle_error) / time_diff)
 			self.prev_angle_error = angle_error
 
-		print angle_velocity
+		#print angle_velocity
 
 		command = Command(tank.index, self.dist(vec[0], vec[1]), angle_velocity, False)
 		self.commands.append(command)
@@ -63,54 +77,56 @@ class PotentialFieldsAgent(object):
 	def calc_obstacles_vector(self, tank):
 		result_vec = [0,0]
 		for obstacle in self.obstacles:
+
 			x_dist = tank.x - obstacle.center[0]
 			y_dist = tank.y - obstacle.center[1]
+
 			if self.quick_circle_collision(x_dist, y_dist, obstacle.radius):
-				result_vec[0] += x_dist * 1000 #INFINITE REPULSION
-				result_vec[1] += y_dist * 1000
+				length = self.dist(x_dist, y_dist)
+				normalized_vec = [x_dist / length, y_dist / length]
+				result_vec[0] += normalized_vec[0] * 5 #INFINITE REPULSION
+				result_vec[1] += normalized_vec[1] * 5
 			elif self.quick_circle_collision(x_dist, y_dist, obstacle.radius + self.goal_field_radius):
 				length = self.dist(x_dist, y_dist)
-				inner_circle_dist = length - self.goal_field_radius
+				inner_circle_dist = length - obstacle.radius
 
-				if inner_circle_dist == 0:
-					return (0,0)
-				proportion = 1 - inner_circle_dist / self.goal_field_radius
+				proportion = 1 - inner_circle_dist / self.obstacle_outer_radius
 				normalized_vec = [x_dist / length, y_dist / length]
-				result_vec[0] += normalized_vec[0] * proportion
-				result_vec[1] += normalized_vec[1] * proportion
+				result_vec[0] += normalized_vec[0] * proportion * self.obstacle_repulse_factor
+				result_vec[1] += normalized_vec[1] * proportion * self.obstacle_repulse_factor
 
 				# do the potential field thingy for the obstacle. closer to the edge is 0, closer to obstacle radius is 1
 
 			else:
 				continue
-			# add vector to result vector
 
 
-	def get_obstacles(self):
-		obstacles = self.bzrc.get_obstacles()
-		self.obstacles = []
-		for obstacle in obstacles:
-			obstacle.center = [(obstacle[0][0] + obstacle[2][0])/ 2, (obstacle[0][1] + obstacle[2][1])/ 2]
-			obstacle.radius = self.dist(obstacle.center[0] - obstacle[0][0], obstacle.center[1] - obstacle[0][1])
-			self.obstacles.append(obstacle)
-	# 		length = self.dist(obsacle.corner1_x - obstacle.corner2_x, obsacle.corner1_y - obstacle.corner2_y)
-	# 		width = self.dist(obsacle.corner1_x - obstacle.corner4_x, obsacle.corner1_y - obstacle.corner4_y)
-	#
-	# 		long_Side = max(length, width)
-			"""
+		return result_vec
 
-		if obtacle is not squarish, divide into many squarish obstacles
+	def calc_tangential_vector(self, tank):
+		result_vec = [0,0]
+		for obstacle in self.obstacles:
 
-		determine shorter side (length vs width)
-		divide longer by shorter
-		if value is greater than 2
+			x_dist = tank.x - obstacle.center[0]
+			y_dist = tank.y - obstacle.center[1]
 
-			divide obstacle into sections based on the ratio of long side to short side
-		else
-			make a circle around obstacle
-		"""
+			length = self.dist(x_dist, y_dist)
+			normalized_vec = [x_dist / length, y_dist / length]
+			normal_tangent = [-normalized_vec[1], normalized_vec[0]]
+
+			if self.quick_circle_collision(x_dist, y_dist, obstacle.radius):
+				result_vec[0] += normal_tangent[0] * 10 #INFINITE REPULSION
+				result_vec[1] += normal_tangent[1] * 10
+			elif self.quick_circle_collision(x_dist, y_dist, obstacle.radius + self.goal_field_radius):
+				inner_circle_dist = length - obstacle.radius
+				proportion = 1 - inner_circle_dist / self.obstacle_outer_radius
+				result_vec[0] += normal_tangent[0] * proportion * self.obstacle_repulse_factor
+				result_vec[1] += normal_tangent[1] * proportion * self.obstacle_repulse_factor
+			else:
+				continue
 
 
+		return result_vec
 
 	def get_goal_vector(self, tank):
 
@@ -144,7 +160,7 @@ class PotentialFieldsAgent(object):
 			normalized_vec[1] = normalized_vec[1] / self.goal_field_radius
 
 		#print 'norm ', normalized_vec
-		return normalized_vec
+		return [normalized_vec[0] * self.goal_attr_factor, normalized_vec[1] * self.goal_attr_factor]
 
 
 	def move_to_position(self, tank, target_x, target_y):
@@ -170,7 +186,63 @@ class PotentialFieldsAgent(object):
 	def quick_circle_collision(self, x, y, radius):
 		return radius * radius >= x * x + y * y;
 
+	def process_obstacles(self):
+		obstacles = self.bzrc.get_obstacles()
+		self.obstacles = []
 
+		for ob in obstacles:
+			new_ob = Obstacle()
+			new_ob.points = ob
+			self.obstacles.append(new_ob)
+
+		i = 0
+		while i < len(self.obstacles):
+
+			obstacle = self.obstacles[i]
+			'''
+			w_diff_x = obstacle.points[3][0] - obstacle.points[0][0]
+			w_diff_y = obstacle.points[3][1] - obstacle.points[0][1]
+			width = self.dist(w_diff_x, w_diff_y)
+
+			h_diff_x = obstacle.points[1][0] - obstacle.points[0][0]
+			h_diff_y = obstacle.points[1][1] - obstacle.points[0][1]
+			height = self.dist(h_diff_x, h_diff_y)
+
+			if width * 2 < height: # obstacle is bigger in height
+				ob1 = Obstacle()
+				ob2 = Obstacle()
+				div_point_1 = (obstacle.points[0][0] + w_diff_x / 2, obstacle.points[0][1] + w_diff_y / 2)
+				div_point_2 = (obstacle.points[1][0] + w_diff_x / 2, obstacle.points[1][1] + w_diff_y / 2)
+				ob1.points = [obstacle.points[0], obstacle.points[1], div_point_2, div_point_1]
+				ob2.points = [div_point_1, div_point_2, obstacle.points[2], obstacle.points[3]]
+				self.obstacles.append(ob1)
+				self.obstacles.append(ob2)
+				del self.obstacles[i]
+				i -= 1
+			elif height * 2 < width: # obstacle is bigger in width
+				ob1 = Obstacle()
+				ob2 = Obstacle()
+				div_point_1 = (obstacle.points[0][0] + h_diff_x / 2, obstacle.points[0][1] + h_diff_y / 2)
+				div_point_2 = (obstacle.points[3][0] + h_diff_x / 2, obstacle.points[3][1] + h_diff_y / 2)
+				ob1.points = [obstacle.points[0], div_point_1, div_point_2, obstacle.points[3] ]
+				ob2.points = [div_point_1, obstacle.points[1], obstacle.points[2], div_point_2]
+				self.obstacles.append(ob1)
+				self.obstacles.append(ob2)
+				print len(self.obstacles)
+				del self.obstacles[i]
+				print len(self.obstacles)
+				i -= 1
+			'''
+			obstacle.center = [(obstacle.points[0][0] + obstacle.points[2][0])/ 2, \
+				(obstacle.points[0][1] + obstacle.points[2][1])/ 2]
+			obstacle.radius = self.dist(obstacle.center[0] - obstacle.points[0][0], \
+				obstacle.center[1] - obstacle.points[0][1]) + self.obstacle_radius_extension
+
+
+			i += 1
+
+class Obstacle(object):
+	pass
 def main():
 	# Process CLI arguments.
 	try:
