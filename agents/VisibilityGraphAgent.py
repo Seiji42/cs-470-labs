@@ -16,69 +16,162 @@ class VisibilityGraphAgent(object):
 
     def init_graph(self):
         flags = self.bzrc.get_flags()
-        obstacles = self.bzrc.get_obstacles()
+        self.obstacles = self.bzrc.get_obstacles()
+
 
         for flag in flags:
             self.visibilityGraph[(flag.x, flag.y)] = {}
             for key in self.visibilityGraph.keys():
-                self.visibilityGraph[key][(flag.x, flag.y)] = 0
-                self.visibilityGraph[(flag.x, flag.y)][key] = 0
+                distance = math.sqrt(math.pow(key[0] - flag.x, 2) + math.pow(key[1] - flag.y, 2))
+                self.visibilityGraph[key][(flag.x, flag.y)] = distance
+                self.visibilityGraph[(flag.x, flag.y)][key] = distance
 
-        for obstacle in obstacles:
+        for obstacle in self.obstacles:
             for corner in obstacle:
                 self.visibilityGraph[corner] = {}
                 for key in self.visibilityGraph.keys():
-                    self.visibilityGraph[corner][key] = 0
-                    self.visibilityGraph[key][corner] = 0
+                    distance = math.sqrt(math.pow(key[0] - corner[0], 2) + math.pow(key[1] - corner[1], 2))
+                    self.visibilityGraph[corner][key] = distance
+                    self.visibilityGraph[key][corner] = distance
 
-
-        self.addObstacles(obstacles)
-        self.addEdges()
+        self.removeEdges()
+        # self.addObstacles()
+        # self.addEdges()
         print self.visibilityGraph
 
-    def addEdges(self):
-        keys = self.visibilityGraph.keys()
-        for i in range(0, len(keys)):
-            for j in range (0, i):
-                point1 = keys[i]
-                point2 = keys[j]
-                edgeVector = (point2[0]-point1[0], point2[1]-point1[1]) # translate to origin
-                addEdge = True
-                for key1 in self.visibilityGraph.keys():
-                    for key2 in self.visibilityGraph.keys():
-                        if self.visibilityGraph[key1][key2] > 0:
-                            #translate points
-                            keypoint1 = (key1[0]-point1[0], key1[1]-point1[1])
-                            keypoint2 = (key2[0]-point1[0], key2[1]-point1[1])
-                            if self.linesCross(keypoint1, keypoint2, edgeVector):
-                                addEdge = False
-                                break
-                    if not addEdge:
-                        break
-                if addEdge:
-                    distance = math.sqrt(math.pow(point1[0] - point2[0], 2) + math.pow(point1[1] - point2[1], 2))
-                    self.visibilityGraph[point1][point2] = distance
-                    self.visibilityGraph[point2][point1] = distance
+    def removeEdges(self):
+        points = self.visibilityGraph.keys()
+        for pi in range(0, len(points)):
+            pnt1 = points[pi]
+            for pj in range(0, pi):
+                pnt2 = points[pj]
+                for obstacle in self.obstacles:
+                    for oi in range(0, len(obstacle)):
+                        edge1 = obstacle[oi]
+                        edge2 = obstacle[(oi + 1) % len(obstacle)]
+                        if self.intersects(edge1, edge2, pnt1, pnt2):
+                            self.visibilityGraph[pnt1][pnt2] = 0.0
+                            self.visibilityGraph[pnt2][pnt1] = 0.0
 
-    def linesCross(self, point1, point2, edge):
-        dot1 = edge[0] * point1[0] + edge[1] * point1[1]
-        dot2 = edge[0] * point2[0] + edge[1] * point2[1]
+                # remove edge if it intersects with an obstacle
 
-        #if dotproduct signs are different, the lines cross
-        return dot1 <= 0 and dot2 >= 0 or dot1 >= 0 and dot2 <= 0
+    def intersects(self, edge1, edge2, point1, point2):
+        #if the edges are the same, return false
+        if edge1 == point1 and edge2 == point2 or edge1 == point2 and edge2 == point1:
+            return False
+        edet1 = (edge2[0] - edge1[0]) * (point1[1] - edge1[1]) - (edge2[1] - edge1[1]) * (point1[0] - edge1[0])
+        edet2 = (edge2[0] - edge1[0]) * (point2[1] - edge1[1]) - (edge2[1] - edge1[1]) * (point2[0] - edge1[0])
 
-    def addObstacles(self, obstacles):
-        for i in range(0, len(obstacles)):
-            obstacle = obstacles[i]
-            for j in range(0, len(obstacle)):
-                cor = obstacle[j]
-                for k in range(0, j):
-                    cor2 = obstacle[k]
-                    if cor2[0] != cor[0] and cor2[1] != cor[1]:
-                        continue # if corners are oposite corners, skip
-                    distance = math.sqrt(math.pow(cor2[0] - cor[0], 2) + math.pow(cor2[1] - cor[1], 2))
-                    self.visibilityGraph[cor][cor2] = distance
-                    self.visibilityGraph[cor2][cor] = distance
+        pdet1 = (point2[0] - point1[0]) * (edge1[1] - point1[1]) - (point2[1] - point1[1]) * (edge1[0] - point1[0])
+        pdet2 = (point2[0] - point1[0]) * (edge2[1] - point1[1]) - (point2[1] - point1[1]) * (edge2[0] - point1[0])
+
+        if (edet1 >= 0 and edet2 >= 0) or (edet1 <= 0 and edet2 <= 0) or (pdet1 >= 0 and pdet2 >= 0) or (pdet1 <= 0 and pdet2 <=     0):
+            return False
+        # elif (det1 > 0 and det2 < 0) or (det1 < 0 and det2 > 0):
+        #     return True
+        else:
+            #if both match, return False
+            #if one matches ?
+            #if none match return false
+            #need to figure this out quick
+            return True
+    # def addObstacles(self):
+    #     """
+    #     loop through the obstacles
+    #         loop through the corners
+    #             make edge to connecting corners
+    #             loop through previous obstacles
+    #                 loop through previous obstacle corners
+    #                     try to add new edge
+    #     """
+    #     # used later to reduce number of comparisons between obstacles
+    #     #loop through obstacles
+    #     for oi in range(0, len(self.obstacles)):
+    #         obstacle = self.obstacles[oi]
+    #         #loop through corners
+    #         for ci in range(0, len(obstacle)):
+    #             cnr = obstacle[ci]
+    #             #loop through previous corners
+    #             for cj in range(0, ci):
+    #                 cnr2 = obstacle[cj]
+    #                 #skip edge if corners are not adjacent
+    #                 if cnr2[0] != cnr[0] and cnr2[1] != cnr[1]:
+    #                     continue
+    #                 #add euclidean distance as huristic
+    #                 distance = math.sqrt(math.pow(cnr2[0] - cnr[0], 2) + math.pow(cnr2[1] - cnr[1], 2))
+    #                 self.visibilityGraph[cnr][cnr2] = distance
+    #                 self.visibilityGraph[cnr2][cnr] = distance
+    #             #loop through previous obstacles
+    #             for oj in range(0, oi):
+    #                 obstacle2 = self.obstacles[oj]
+    #                 for c2i in range(0, len(obstacle2)):
+    #                     prev_cnr = obstacle2[c2i]
+    #                     #check that the corners aren't the same
+    #                     if prev_cnr != cnr:
+    #                         self.addEdge(cnr, prev_cnr)
+    #
+    # def addEdge(self, new_pnt, old_pnt):
+    #     """
+    #     loop through all obstacle edges
+    #         check to see if new edge intersects with obstacle edge
+    #     if doesn't intersect with any obstacle edge, add edge
+    #     """
+    #
+    #     addEdge = True
+    #     # print "new_pnt " + str(new_pnt)
+    #     # print "old_pnt " + str(old_pnt)
+    #
+    #     for oi in range(0, len(self.obstacles)):
+    #
+    #         obstacle = self.obstacles[oi]
+    #         #loop through corners
+    #         for ci in range(0, len(obstacle)):
+    #             cnr = obstacle[ci]
+    #             cnr2 = obstacle[(ci + 1) % len(obstacle)]
+    #
+    #             # print "cnr " + str(cnr)
+    #             #
+    #             # print "cnr2 " + str(cnr2)
+    #             # print str(self.linesCross(cnr, cnr2, new_pnt, old_pnt))
+    #             if(self.linesCross(cnr, cnr2, new_pnt, old_pnt)):
+    #                 addEdge = False
+    #                 break
+    #         if not addEdge:
+    #             break
+    #
+    #     if addEdge:
+    #         distance = math.sqrt(math.pow(old_pnt[0] - new_pnt[0], 2) + math.pow(old_pnt[1] - new_pnt[1], 2))
+    #         self.visibilityGraph[new_pnt][old_pnt] = distance
+    #         self.visibilityGraph[old_pnt][new_pnt] = distance
+    #
+    #     # loop through visibilityGraph to see if edge can be added
+    # def linesCross(self, edge1, edge2, pnt1, pnt2):
+    #     share_point = edge1 == pnt1 or edge1 == pnt2 or edge2 == pnt1 or edge2 == pnt2
+    #     # if they don't share points, just check for sign being completely oposite
+    #     # if they do share points
+    #     # use share_point to determine which check to use
+    #     edge_vect = (edge2[0] - edge1[0], edge2[1] - edge1[1])
+    #     pnt1_vect = (pnt1[0] - edge1[0], pnt1[1] - edge1[1])
+    #     pnt2_vect = (pnt2[0] - edge1[0], pnt2[1] - edge1[1])
+    #
+    #     det1 = edge_vect[0] * pnt1_vect[1] - edge_vect[1] * pnt1_vect[0]
+    #     print det1
+    #     det2 = edge_vect[0] * pnt2_vect[1] - edge_vect[1] * pnt2_vect[0]
+    #     print det2
+    #
+    #     if det1 < 0 and det2 > 0 or det1 > 0 and det2 < 0:
+    #         print "opposite"
+    #         return True
+    #     elif det1 > 0 and det2 > 0 or det1 < 0 and det2 < 0:
+    #         print "same"
+    #         return False
+    #     else:
+    #         print "?"
+    #         return False
+    #     # elif det1 == 0 and det2 == 0:
+    #     #     return share_point
+    #     # else:
+    #     #     return not share_point
 
     def tick(self, time_diff):
         """Some time has passed; decide what to do next."""
@@ -158,7 +251,6 @@ def main():
     except KeyboardInterrupt:
         print "Exiting due to keyboard interrupt."
         bzrc.close()
-
 
 if __name__ == '__main__':
     main()
