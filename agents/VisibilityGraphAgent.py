@@ -3,6 +3,8 @@ import math
 import time
 
 from bzrc import BZRC, Command
+from astarsearch import AStarSearch
+from depthfirstsearch import DepthFirstSearch
 
 class VisibilityGraphAgent(object):
     """Class handles all command and control logic for a teams tanks."""
@@ -12,19 +14,27 @@ class VisibilityGraphAgent(object):
         self.constants = self.bzrc.get_constants()
         self.commands = []
         self.visibilityGraph = {}
-        self.init_graph()
+        mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
+        self.mytanks = mytanks
+        self.goal = self.getGoal(flags, self.constants)
+        print (self.goal.x, self.goal.y)
+        print (mytanks[0].x, mytanks[0].y)
+        self.init_graph((mytanks[0].x, mytanks[0].y), (self.goal.x, self.goal.y))
 
-    def init_graph(self):
+    def init_graph(self, start, goal):
         flags = self.bzrc.get_flags()
         self.obstacles = self.bzrc.get_obstacles()
 
+        self.visibilityGraph[start] = {}
+        self.visibilityGraph[start][start] = 0
 
-        for flag in flags:
-            self.visibilityGraph[(flag.x, flag.y)] = {}
-            for key in self.visibilityGraph.keys():
-                distance = math.sqrt(math.pow(key[0] - flag.x, 2) + math.pow(key[1] - flag.y, 2))
-                self.visibilityGraph[key][(flag.x, flag.y)] = distance
-                self.visibilityGraph[(flag.x, flag.y)][key] = distance
+        #for flag in flags:
+        self.visibilityGraph[goal] = {}
+        self.visibilityGraph[goal][goal] = 0
+
+        distance = math.sqrt(math.pow(start[0] - goal[0], 2) + math.pow(start[1] - goal[1], 2))
+        self.visibilityGraph[start][goal] = distance
+        self.visibilityGraph[goal][start] = distance
 
         for obstacle in self.obstacles:
             for corner in obstacle:
@@ -35,7 +45,11 @@ class VisibilityGraphAgent(object):
                     self.visibilityGraph[key][corner] = distance
 
         self.removeEdges()
-        print self.visibilityGraph
+        print self.visibilityGraph[start]
+        #search = DepthFirstSearch()
+        search = AStarSearch()
+        path = search.search(self.visibilityGraph, start, goal)
+        print path
 
     def removeEdges(self):
         points = self.visibilityGraph.keys()
@@ -85,10 +99,18 @@ class VisibilityGraphAgent(object):
 
         self.commands = []
 
-        for tank in mytanks:
-            self.attack_enemies(tank)
+        #for tank in mytanks:
+
+
 
         results = self.bzrc.do_commands(self.commands)
+
+    def getGoal(self, flags, constants):
+        print constants
+        for flag in flags:
+            if flag.color != constants['team']:
+                print flag.color
+                return flag
 
     # def attack_enemies(self, tank):
     #     """Find the closest enemy and chase it, shooting as you go."""
