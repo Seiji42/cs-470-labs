@@ -5,6 +5,7 @@ import time
 from bzrc import BZRC, Command
 from astarsearch import AStarSearch
 from depthfirstsearch import DepthFirstSearch
+from breadthfirstsearch import BreadthFirstSearch
 
 class VisibilityGraphAgent(object):
     """Class handles all command and control logic for a teams tanks."""
@@ -47,7 +48,8 @@ class VisibilityGraphAgent(object):
         self.removeEdges()
         print self.visibilityGraph[start]
         #search = DepthFirstSearch()
-        search = AStarSearch()
+        #search = AStarSearch()
+        search = BreadthFirstSearch()
         path = search.search(self.visibilityGraph, start, goal)
         print path
 
