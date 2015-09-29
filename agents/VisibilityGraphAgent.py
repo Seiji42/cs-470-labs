@@ -11,6 +11,7 @@ class VisibilityGraphAgent(object):
     """Class handles all command and control logic for a teams tanks."""
 
     def __init__(self, bzrc):
+        self.obstacle_radius_extension = 20
         self.bzrc = bzrc
         self.constants = self.bzrc.get_constants()
         self.commands = []
@@ -21,6 +22,8 @@ class VisibilityGraphAgent(object):
         print (self.goal.x, self.goal.y)
         print (mytanks[0].x, mytanks[0].y)
         self.init_graph((mytanks[0].x, mytanks[0].y), (self.goal.x, self.goal.y))
+        self.process_obstacles()
+
 
     def init_graph(self, start, goal):
         flags = self.bzrc.get_flags()
@@ -29,7 +32,6 @@ class VisibilityGraphAgent(object):
         self.visibilityGraph[start] = {}
         self.visibilityGraph[start][start] = 0
 
-        #for flag in flags:
         self.visibilityGraph[goal] = {}
         self.visibilityGraph[goal][goal] = 0
 
@@ -47,11 +49,11 @@ class VisibilityGraphAgent(object):
 
         self.removeEdges()
         print self.visibilityGraph[start]
-        #search = DepthFirstSearch()
+        search = DepthFirstSearch()
         #search = AStarSearch()
-        search = BreadthFirstSearch()
-        path = search.search(self.visibilityGraph, start, goal)
-        print path
+        #search = BreadthFirstSearch()
+        self.path = search.search(self.visibilityGraph, start, goal)
+        print self.path
 
     def removeEdges(self):
         points = self.visibilityGraph.keys()
@@ -114,6 +116,35 @@ class VisibilityGraphAgent(object):
                 print flag.color
                 return flag
 
+    def process_obstacles(self):
+        obstacles = self.bzrc.get_obstacles()
+        self.obstacles = []
+
+        for ob in obstacles:
+            new_ob = Obstacle()
+            new_ob.points = ob
+            self.obstacles.append(new_ob)
+
+        i = 0
+        while i < len(self.obstacles):
+
+            obstacle = self.obstacles[i]
+            obstacle.center = [(obstacle.points[0][0] + obstacle.points[2][0])/ 2, \
+                (obstacle.points[0][1] + obstacle.points[2][1])/ 2]
+            obstacle.radius = self.dist(obstacle.center[0] - obstacle.points[0][0], \
+                obstacle.center[1] - obstacle.points[0][1]) + self.obstacle_radius_extension
+
+            i += 1
+
+    def dist(self, x, y):
+        return math.sqrt(x * x + y * y)
+
+    def quick_circle_collision(self, x, y, radius):
+        return radius * radius >= x * x + y * y;
+
+class Obstacle(object):
+    pass
+
     # def attack_enemies(self, tank):
     #     """Find the closest enemy and chase it, shooting as you go."""
     #     best_enemy = None
@@ -147,6 +178,7 @@ class VisibilityGraphAgent(object):
     #     elif angle > math.pi:
     #         angle -= 2 * math.pi
     #     return angle
+
 
 
 def main():
