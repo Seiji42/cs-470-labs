@@ -1,29 +1,38 @@
 import Queue
 import math
 from collections import defaultdict
+from GraphSearch import GraphSearch
 
-class BreadthFirstSearch:
-    def __init__(self):
+class BreadthFirstSearch(GraphSearch):
+    def __init__(self, plot):
+        GraphSearch.__init__(self, plot)
         self.visibilityGraph = None
 
     def search(self, visibilityGraph, start, goal):
         self.visibilityGraph = visibilityGraph
-        q = Queue.Queue()
+        q = []
         q_set = set()
-        q.put(start)
+        q.append(start)
+        q_set.add(start)
         discovered = set()
         came_from = {}
         while q:
-            curr_node = q.get()
+            if self.plot:
+                self.plot_graph(q_set, discovered, "BreadthFirstSearch")
+            curr_node = q.pop(0)
             if curr_node == goal:
+                discovered.add(goal)
+                if self.plot:
+                    self.plot_graph(q_set, discovered, "BreadthFirstSearch")
                 return self.rebuild_path(came_from, curr_node)
             if curr_node not in discovered:
                 discovered.add(curr_node)
+                q_set.remove(curr_node)
                 for neighbor in visibilityGraph.keys():
                     if self.canVisit(curr_node, neighbor) and neighbor not in q_set \
                                                 and neighbor not in discovered:
                         came_from[neighbor] = curr_node
-                        q.put(neighbor)
+                        q.append(neighbor)
                         q_set.add(neighbor)
 
     def canVisit(self, curr, neighbor):

@@ -1,16 +1,19 @@
 import Queue as queue
 import math
 from collections import defaultdict
+from GraphSearch import GraphSearch
 
-class AStarSearch:
-    def __init__(self):
+class AStarSearch(GraphSearch):
+    def __init__(self, plot):
+        GraphSearch.__init__(self, plot)
         self.visibilityGraph = None
 
     def search(self, visibilityGraph, start, goal):
         self.visibilityGraph = visibilityGraph
         frontier = queue.PriorityQueue()
-        frontier_set =  set()
+        frontier_set = set()
         frontier.put((0, 1, start))
+        frontier_set.add(start)
         explored = set()
         g_score = defaultdict(lambda: float("inf"), {})
         g_score[start] = 0
@@ -19,8 +22,14 @@ class AStarSearch:
         came_from = {}
 
         while not frontier.empty():
+            if self.plot:
+                self.plot_graph(frontier_set, explored, "AStarSearch")
             curr_node = frontier.get()[2]
+            frontier_set.remove(curr_node)
             if curr_node == goal:
+                explored.add(curr_node)
+                if self.plot:
+                    self.plot_graph(frontier_set, explored, "AStarSearch")
                 return self.rebuild_path(came_from, goal)
             explored.add(curr_node)
 

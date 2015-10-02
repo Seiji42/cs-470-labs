@@ -27,7 +27,6 @@ set arrow from -200.0, 120.0 to 0.0, 120.0 nohead lt 3 linecolor rgb "blue"
 
 unset arrow
 set arrow from 0.0, -370.0 to -260.0, -20.0 nohead lt 3 linecolor rgb "red"
-set arrow from -260.0, -20.0 to -270.0, 150.0 nohead lt 3 linecolor rgb "red"
-set arrow from -270.0, 150.0 to -230.0, 150.0 nohead lt 3 linecolor rgb "red"
-set arrow from -230.0, 150.0 to 14.0, 372.0 nohead lt 3 linecolor rgb "red"
-
+set arrow from -260.0, -20.0 to -260.0, 20.0 nohead lt 3 linecolor rgb "red"
+set arrow from -260.0, 20.0 to -200.0, 120.0 nohead lt 3 linecolor rgb "red"
+set arrow from -200.0, 120.0 to -1.0, 374.0 nohead lt 3 linecolor rgb "red"

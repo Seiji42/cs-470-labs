@@ -10,7 +10,7 @@ from breadthfirstsearch import BreadthFirstSearch
 class VisibilityGraphAgent(object):
     """Class handles all command and control logic for a teams tanks."""
 
-    def __init__(self, bzrc):
+    def __init__(self, bzrc, search):
         self.obstacle_radius_extension = 20
         self.bzrc = bzrc
         self.constants = self.bzrc.get_constants()
@@ -18,11 +18,14 @@ class VisibilityGraphAgent(object):
         self.visibilityGraph = {}
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
-        self.goal = self.getGoal(flags, self.constants)
-        print (self.goal.x, self.goal.y)
-        print (mytanks[0].x, mytanks[0].y)
-        self.init_graph((mytanks[0].x, mytanks[0].y), (self.goal.x, self.goal.y))
         self.process_obstacles()
+        self.goal = self.getGoal(flags, self.constants)
+        self.goal = (self.goal.x, self.goal.y)
+        self.position = (mytanks[0].x, mytanks[0].y)
+        self.search = search
+        self.search.obstacles = self.obstacles
+        self.init_graph((mytanks[0].x, mytanks[0].y), self.goal)
+
 
 
     def init_graph(self, start, goal):
@@ -49,10 +52,7 @@ class VisibilityGraphAgent(object):
 
         self.removeEdges()
         print self.visibilityGraph[start]
-        search = DepthFirstSearch()
-        #search = AStarSearch()
-        #search = BreadthFirstSearch()
-        self.path = search.search(self.visibilityGraph, start, goal)
+        self.path = self.search.search(self.visibilityGraph, start, goal)
         print self.path
 
     def removeEdges(self):
