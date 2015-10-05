@@ -7,15 +7,16 @@ from bzrc import BZRC, Command
 
 class PotentialFieldsAgent(object):
 
-	def __init__(self, bzrc, color):
+	def __init__(self, bzrc):
 		self.bzrc = bzrc
 		self.constants = self.bzrc.get_constants()
 		self.commands = []
 
+		self.obstacles = []
+
 		self.goal_field_radius = 50.0
 		self.goal_attr_factor = 1
 		self.outside_goal_speed = 1.0
-		self.color = color
 		self.prev_angle_error = 0
 		self.angle_P = 5
 		self.angle_D = 5
@@ -133,24 +134,19 @@ class PotentialFieldsAgent(object):
 
 	def calc_goal_vector(self, tank):
 
-		#print tank.flag
 		if tank.flag != '-':
 			for base in self.bases:
-				if base.color == self.color:
+				if base.color == self.constants['team']:
 					goal = ((base.corner3_x + base.corner1_x) / 2,
 					(base.corner3_y + base.corner1_y) / 2)
 
 		else:
 			for flag in self.flags:
-				if flag.poss_color != self.color and flag.color != self.color: #later add closest flag check?
+				if flag.poss_color != self.constants['team'] and flag.color != self.constants['team']: #later add closest flag check?
 					goal = (flag.x, flag.y)
 
-		#print "goal ", goal
 		x_dist = goal[0] - tank.x
 		y_dist = goal[1] - tank.y
-
-		#print x_dist
-		#print y_dist
 
 		length = self.dist(x_dist, y_dist)
 
@@ -161,9 +157,6 @@ class PotentialFieldsAgent(object):
 		normalized_vec = [x_dist / length, y_dist / length]
 		if self.quick_circle_collision(x_dist, y_dist, self.goal_field_radius):
 			proportion = length / self.goal_field_radius
-		if proportion != 1:
-			print 'proportion', proportion
-		#print 'norm ', normalized_vec
 		return [normalized_vec[0] * self.goal_attr_factor * proportion, normalized_vec[1] * self.goal_attr_factor * proportion]
 
 
@@ -191,31 +184,155 @@ class PotentialFieldsAgent(object):
 		return radius * radius >= x * x + y * y;
 
 	def process_obstacles(self):
+		'''
+		store obstacles locally
+		for each obstacle
+			translate to center and rotate corners
+			get width and height and divide width by height
+			if resulting ratio is greater than 2
+				width is larger than height
+				counter = 0
+				while counter + height < width
+					create obstacle
+					counter += height
+				create obstacle with remaining portion of obstacle
+			elif ratio is less than 1/2
+				height is larger than width
+				counter = 0
+				while counter + width < height
+					create obstacle
+					counter += width
+				create obstacle with remaining portion of obstacle
+			else
+				push obstacle
+		'''
 		obstacles = self.bzrc.get_obstacles()
-		self.obstacles = []
 
-		for ob in obstacles:
-			new_ob = Obstacle()
-			new_ob.points = ob
-			self.obstacles.append(new_ob)
+		for obstacle in obstacles:
+			"""
+			transform
+			divide
+			untransform
+			push
+			"""
+			#transform
+			trans_x = 0 - obstacle[0][0]
+			trans_y = 0 - obstacle[0][1]
+			rot_angle = self.normalize_angle(math.atan2(obstacle[0][0] - obstacle[1][0], obstacle[0][1] - obstacle[1][1]))
+			sin_ang = math.sin(rot_angle)
+			cos_ang = math.cos(rot_angle)
 
-		i = 0
-		while i < len(self.obstacles):
+			trans_points = []
+			for i in range(0, len(obstacle)):
+				x, y = obstacle[i]
+				x = x + trans_x
+				y = y + trans_y
+				rot_x = x * cos_ang - y * sin_ang
+				rot_y = x * sin_ang + y * cos_ang
+				trans_points.append([rot_x, rot_y])
 
-			obstacle = self.obstacles[i]
-			obstacle.center = [(obstacle.points[0][0] + obstacle.points[2][0])/ 2, \
-				(obstacle.points[0][1] + obstacle.points[2][1])/ 2]
-			obstacle.radius = self.dist(obstacle.center[0] - obstacle.points[0][0], \
-				obstacle.center[1] - obstacle.points[0][1]) + self.obstacle_radius_extension
+			# divide
+			ob_wid = math.fabs(trans_points[0][0] - trans_points[3][0])
+			ob_hgt = math.fabs(trans_points[0][1] - trans_points[1][1])
 
-			i += 1
+			len_to_wid = ob_wid / ob_hgt
+
+			temp_obstacles = []
+
+			if len_to_wid >= 2:
+				#length is greater than width
+				temp_obstacles = self.divide_obstacle_l(ob_wid, ob_hgt, trans_points)
+			elif len_to_wid <= 0.5:
+				#width is greater than length
+				temp_obstacles = self.divide_obstacle_h(ob_wid, ob_hgt, trans_points)
+
+			#untransform
+			for temp_ob in temp_obstacles:
+				for corner in temp_ob:
+					x, y = corner
+					rot_x = x * cos_ang + y * sin_ang
+					rot_y = x * -sin_ang + y * cos_ang
+					x = rot_x - trans_x
+					y = rot_y - trans_y
+					corner = [x,y]
+
+			if not temp_obstacles:
+				self.create_obstacle(obstacle)
+			else:
+				print "many"
+				for temp_ob in temp_obstacles:
+					self.create_obstacle(temp_ob)
+
+	def divide_obstacle_l(self, ob_wid, ob_hgt, trans_points):
+		final_obstacle_list = []
+		counter = 0
+		# make smaller obstacles
+		while counter + ob_hgt < ob_wid:
+			point1 = [trans_points[0][0] - counter, trans_points[0][1]]
+			point2 = [trans_points[1][0] - counter, trans_points[1][1]]
+			point3 = [trans_points[1][0] - counter - ob_hgt, trans_points[1][1]]
+			point4 = [trans_points[0][0] - counter - ob_hgt, trans_points[0][1]]
+
+			obstacle_points = [point1, point2, point3, point4]
+
+			final_obstacle_list.append(obstacle_points)
+			counter = counter + ob_hgt
+
+		# make obstacle with leftover portion
+		point1 = [trans_points[0][0] - counter, trans_points[0][1]]
+		point2 = [trans_points[1][0] - counter, trans_points[1][1]]
+
+		obstacle_points = [point1, point2, trans_points[2], trans_points[3]]
+
+		final_obstacle_list.append(obstacle_points)
+
+		return final_obstacle_list
+
+	def divide_obstacle_h(self, ob_wid, ob_hgt, trans_points):
+
+		final_obstacle_list = []
+		counter = 0
+		# make smaller obstacles
+		while counter + ob_wid < ob_hgt:
+			point1 = [trans_points[0][0], trans_points[0][1] - counter]
+			point2 = [trans_points[0][0], trans_points[0][1] - counter - ob_wid]
+			point3 = [trans_points[3][0], trans_points[3][1] - counter - ob_wid]
+			point4 = [trans_points[3][0], trans_points[3][1] - counter]
+
+			obstacle_points = [point1, point2, point3, point4]
+
+			final_obstacle_list.append(obstacle_points)
+			counter = counter + ob_wid
+
+		# make obstacle with leftover portion
+		point1 = [trans_points[0][0], trans_points[0][1] - counter]
+		point2 = [trans_points[3][0], trans_points[3][1] - counter]
+
+		obstacle_points = [point1, trans_points[1], trans_points[2], point2]
+
+		final_obstacle_list.append(obstacle_points)
+
+		return final_obstacle_list
+
+	def create_obstacle(self, points):
+		new_ob = Obstacle()
+		new_ob.points = points
+
+		new_ob.center = [(new_ob.points[0][0] + new_ob.points[2][0])/ 2, \
+			(new_ob.points[0][1] + new_ob.points[2][1])/ 2]
+		new_ob.radius = self.dist(new_ob.center[0] - new_ob.points[0][0], \
+			new_ob.center[1] - new_ob.points[0][1]) + self.obstacle_radius_extension
+
+		self.obstacles.append(new_ob)
+
+
 
 class Obstacle(object):
 	pass
 def main():
 	# Process CLI arguments.
 	try:
-		execname, host, port, color = sys.argv
+		execname, host, port = sys.argv
 	except ValueError:
 		execname = sys.argv[0]
 		print >>sys.stderr, '%s: incorrect number of arguments' % execname
@@ -226,7 +343,7 @@ def main():
 	#bzrc = BZRC(host, int(port), debug=True)
 	bzrc = BZRC(host, int(port))
 
-	agent = PotentialFieldsAgent(bzrc, color)
+	agent = PotentialFieldsAgent(bzrc)
 
 	prev_time = time.time()
 
