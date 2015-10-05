@@ -23,6 +23,8 @@ def draw_line(p1, p2, ax):
 
 def draw_obstacles(obstacles, ax):
     for obstacle in obstacles:
+        print "points"
+        print obstacle.points
         obs = obstacle.points
         rect1 = matplotlib.patches.Rectangle((obs[1][0],obs[1][1]), \
             obs[2][0] - obs[1][0], obs[0][1] - obs[1][1], color='blue')
@@ -45,14 +47,14 @@ def plot_position(position):
 
 if __name__ == '__main__':
     HOST = 'localhost'
-    PORT = '46525'
+    PORT = '45441'
     bzrc = BZRC(HOST, int(PORT))
-    agent = VisibilityGraphAgent(bzrc, DepthFirstSearch(True))
+    agent = VisibilityGraphAgent(bzrc, AStarSearch(True))
     fig = plt.figure()
     plt.axis([-WORLDSIZE / 2, WORLDSIZE / 2, -WORLDSIZE / 2, WORLDSIZE / 2])
     ax = fig.add_subplot(111)
-    #draw_obstacles(agent.obstacles, ax)
-    #plot_path(agent.path, ax)
-    #plot_goal(agent.goal)
-    #plot_position(agent.position)
-    #plt.show()
+    draw_obstacles(agent.obstacles, ax)
+    plot_path(agent.path, ax)
+    plot_goal(agent.goal)
+    plot_position(agent.position)
+    plt.show()
