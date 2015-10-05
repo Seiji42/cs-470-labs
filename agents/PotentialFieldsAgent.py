@@ -259,7 +259,6 @@ class PotentialFieldsAgent(object):
 			if not temp_obstacles:
 				self.create_obstacle(obstacle)
 			else:
-				print "many"
 				for temp_ob in temp_obstacles:
 					self.create_obstacle(temp_ob)
 
