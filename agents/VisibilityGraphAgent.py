@@ -14,19 +14,19 @@ class VisibilityGraphAgent(object):
 		self.bzrc = bzrc
 		self.constants = self.bzrc.get_constants()
 		self.commands = []
-		self.goal_point_radius = 20.0
-		self.goal_field_radius = 50.0
+		self.goal_point_radius = 30.0
+		self.goal_field_radius = 30.0
 		self.goal_attr_factor = 1
 		self.outside_goal_speed = 1.0
 		self.prev_angle_error = 0
 		self.angle_P = 5
 		self.angle_D = 5
-		self.obstacle_inner_repulse = 0.6
-		self.obstacle_outer_repulse = 0.3
-		self.obstacle_radius_extension = 20
-		self.inner_tangential_force = 0.6
-		self.outer_tangential_force = 0.4
+		self.obstacle_inner_repulse = 0.7
+		self.obstacle_outer_repulse = 0.5
 		self.obstacle_outer_radius = 40
+		self.inner_tangential_force = 0.3
+		self.outer_tangential_force = 0.2
+
 		self.visibilityGraph = {}
 		self.curr_goal_point = None
 		self.mytanks, self.othertanks, self.flags, self.shots = self.bzrc.get_lots_o_stuff()
@@ -82,8 +82,8 @@ class VisibilityGraphAgent(object):
 					self.visibilityGraph[obstacle[2]][obstacle[0]] = 0.0
 					self.visibilityGraph[obstacle[1]][obstacle[3]] = 0.0
 					self.visibilityGraph[obstacle[3]][obstacle[1]] = 0.0
-
-				# remove edge if it intersects with an obstacle
+					#check to see if edge is on edge of world
+					#if so, remove
 
 	def intersects(self, edge1, edge2, point1, point2):
 		#if the edges are the same, return false
@@ -203,7 +203,7 @@ class VisibilityGraphAgent(object):
 			if self.quick_circle_collision(x_dist, y_dist, obstacle.radius):
 				result_vec[0] += normal_tangent[0] * self.inner_tangential_force
 				result_vec[1] += normal_tangent[1] * self.inner_tangential_force
-			elif self.quick_circle_collision(x_dist, y_dist, obstacle.radius + self.goal_field_radius):
+			elif self.quick_circle_collision(x_dist, y_dist, obstacle.radius + self.obstacle_outer_radius):
 				inner_circle_dist = length - obstacle.radius
 				proportion = 1 - inner_circle_dist / self.obstacle_outer_radius
 				result_vec[0] += normal_tangent[0] * proportion * self.outer_tangential_force
@@ -373,7 +373,7 @@ class VisibilityGraphAgent(object):
 		new_ob.center = [(new_ob.points[0][0] + new_ob.points[2][0])/ 2, \
 			(new_ob.points[0][1] + new_ob.points[2][1])/ 2]
 		new_ob.radius = self.dist(new_ob.center[0] - new_ob.points[0][0], \
-			new_ob.center[1] - new_ob.points[0][1]) + self.obstacle_radius_extension
+			new_ob.center[1] - new_ob.points[0][1])
 
 		self.obstacles.append(new_ob)
 
@@ -382,7 +382,7 @@ class Obstacle(object):
 def main():
 	# Process CLI arguments.
 	try:
-		execname, host, port = sys.argv
+		execname, host, port, search = sys.argv
 	except ValueError:
 		execname = sys.argv[0]
 		print >>sys.stderr, '%s: incorrect number of arguments' % execname
@@ -393,7 +393,15 @@ def main():
 	#bzrc = BZRC(host, int(port), debug=True)
 	bzrc = BZRC(host, int(port))
 
-	agent = VisibilityGraphAgent(bzrc, AStarSearch(False))
+	if search == 'b':
+		agent = VisibilityGraphAgent(bzrc, BreadthFirstSearch(False))
+	elif search == 'd':
+		agent = VisibilityGraphAgent(bzrc, DepthFirstSearch(False))
+	elif search == 'a':
+		agent = VisibilityGraphAgent(bzrc, AStarSearch(False))
+	else:
+		print >>sys.stderr, 'bad search value. must be a d or b'
+		sys.exit(-1)
 
 	prev_time = time.time()
 

@@ -5,6 +5,10 @@ from bzrc import Answer
 from bzrc import BZRC
 from PotentialFieldsAgent import PotentialFieldsAgent
 import sys
+from VisibilityGraphAgent import VisibilityGraphAgent
+from astarsearch import AStarSearch
+from depthfirstsearch import DepthFirstSearch
+from breadthfirstsearch import BreadthFirstSearch
 
 FILENAME = 'test_fields.gpi'
 WORLDSIZE = 800
@@ -95,16 +99,16 @@ def plot_field(function):
 
 if __name__ == '__main__':
     FILENAME = sys.argv[1]
+    PORT = sys.argv[2]
     HOST = 'localhost'
-    PORT = '46995'
-    COLOR = 'blue'
     bzrc = BZRC(HOST, int(PORT))
-    agent = PotentialFieldsAgent(bzrc, COLOR)
+    agent = VisibilityGraphAgent(bzrc, AStarSearch(False))
+    agent.curr_goal_point = agent.path[2]
     outfile = open(FILENAME, 'w')
     print >>outfile, gnuplot_header(-WORLDSIZE / 2, WORLDSIZE / 2)
     print >>outfile, draw_obstacles(agent.obstacles)
     field_function = generate_field_function(150)
-    #print >>outfile, plot_field(agent.calculate_potential_fields)
+    print >>outfile, plot_field(agent.calculate_potential_fields)
     #print >>outfile, plot_field(agent.calc_goal_vector)
     #print >>outfile, plot_field(agent.calc_tangential_vector)
-    print >>outfile, plot_field(agent.calc_obstacles_vector)
+    #print >>outfile, plot_field(agent.calc_obstacles_vector)

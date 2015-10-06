@@ -29,7 +29,6 @@ def draw_obstacles(obstacles, ax):
         rect1 = matplotlib.patches.Rectangle((obs[1][0],obs[1][1]), \
             obs[2][0] - obs[1][0], obs[0][1] - obs[1][1], color='blue')
         ax.add_patch(rect1)
-    return s
 
 def plot_path(path, ax):
     '''Return a Gnuplot command to plot a field.'''
@@ -39,7 +38,7 @@ def plot_path(path, ax):
     return s
 
 def plot_goal(goal):
-    plt.plot([goal[0]], [goal[1]], 'pv')
+    plt.plot([goal[0]], [goal[1]], 'gv')
     return
 def plot_position(position):
     plt.plot([position[0]], [position[1]], 'ro')
@@ -47,9 +46,9 @@ def plot_position(position):
 
 if __name__ == '__main__':
     HOST = 'localhost'
-    PORT = '45441'
+    PORT = sys.argv[1]
     bzrc = BZRC(HOST, int(PORT))
-    agent = VisibilityGraphAgent(bzrc, AStarSearch(True))
+    agent = VisibilityGraphAgent(bzrc, DepthFirstSearch(True))
     fig = plt.figure()
     plt.axis([-WORLDSIZE / 2, WORLDSIZE / 2, -WORLDSIZE / 2, WORLDSIZE / 2])
     ax = fig.add_subplot(111)
