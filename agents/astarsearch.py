@@ -59,6 +59,11 @@ class AStarSearch(GraphSearch):
         return total_path
 
         '''
+        man = 1038.23332659
+        euc = 918.175295079
+
+
+
         init frontier to starting pos
         init explored set to empty
         loop do
@@ -71,6 +76,10 @@ class AStarSearch(GraphSearch):
         '''
     def heuristic_cost_estimate(self, start, goal):
         return self.dist(start, goal)
+        # return self.man_dist(start, goal)
+
     def dist(self, p1, p2):
         delta = (p2[0] - p1[0], p2[1] - p1[1])
         return math.sqrt(delta[0] ** 2 + delta[1] ** 2)
+    def man_dist(self, p1, p2):
+        return math.fabs(p1[0]-p2[0]) + math.fabs(p1[1]-p2[1])

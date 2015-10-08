@@ -63,6 +63,10 @@ class VisibilityGraphAgent(object):
 
 		self.removeEdges()
 		self.path = self.search.search(self.visibilityGraph, start, goal)
+		total_cost = 0
+		for point in range(0, len(self.path) - 1):
+			total_cost = total_cost + self.visibilityGraph[self.path[point]][self.path[point + 1]]
+		print total_cost
 
 
 	def removeEdges(self):
@@ -310,8 +314,6 @@ class VisibilityGraphAgent(object):
 					x = rot_x - trans_x
 					y = rot_y - trans_y
 					temp_ob[i] = [x,y]
-					print "un translated"
-					print temp_ob[i]
 
 			if not temp_obstacles:
 				self.create_obstacle(obstacle)
@@ -424,3 +426,22 @@ if __name__ == '__main__':
 	main()
 
 # vim: et sw=4 sts=4
+
+
+
+
+'''
+heuristic changes
+Manhattan
+	-takes less steps than euclidian distance on simple map
+
+random number between 500 and 600 *not admissible*
+
+other things we can do:
+euclidian of one step in advance
+
+
+greedy breadth/depth search
+
+depth limited search
+'''
