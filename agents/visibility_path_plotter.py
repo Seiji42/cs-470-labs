@@ -23,8 +23,6 @@ def draw_line(p1, p2, ax):
 
 def draw_obstacles(obstacles, ax):
     for obstacle in obstacles:
-        print "points"
-        print obstacle.points
         obs = obstacle.points
         rect1 = matplotlib.patches.Rectangle((obs[1][0],obs[1][1]), \
             obs[2][0] - obs[1][0], obs[0][1] - obs[1][1], color='blue')
@@ -48,7 +46,15 @@ if __name__ == '__main__':
     HOST = 'localhost'
     PORT = sys.argv[1]
     bzrc = BZRC(HOST, int(PORT))
-    agent = VisibilityGraphAgent(bzrc, DepthFirstSearch(True))
+    search = AStarSearch(True)
+    if sys.argv[2] == 'b':
+        search = BreadthFirstSearch(True)
+    elif sys.argv[2] == 'd':
+        search = DepthFirstSearch(True)
+    elif sys.argv[2] != 'a':
+        print "You must enter a search type: [a]star, [b]readth first, [d]epth first"
+
+    agent = VisibilityGraphAgent(bzrc, search)
     fig = plt.figure()
     plt.axis([-WORLDSIZE / 2, WORLDSIZE / 2, -WORLDSIZE / 2, WORLDSIZE / 2])
     ax = fig.add_subplot(111)

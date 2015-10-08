@@ -78,6 +78,10 @@ class VisibilityGraphAgent(object):
 						if self.intersects(edge1, edge2, pnt1, pnt2):
 							self.visibilityGraph[pnt1][pnt2] = 0.0
 							self.visibilityGraph[pnt2][pnt1] = 0.0
+						if edge1[0] == edge2[0] and math.fabs(edge1[0]) == 400 \
+							or edge1[1] == edge2[1] and math.fabs(edge1[1]) == 400:
+							self.visibilityGraph[edge1][edge2] = 0.0
+							self.visibilityGraph[edge2][edge1] = 0.0
 					self.visibilityGraph[obstacle[0]][obstacle[2]] = 0.0
 					self.visibilityGraph[obstacle[2]][obstacle[0]] = 0.0
 					self.visibilityGraph[obstacle[1]][obstacle[3]] = 0.0
