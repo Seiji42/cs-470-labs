@@ -23,6 +23,7 @@
 import sys
 import math
 import time
+import random
 import OpenGL
 OpenGL.ERROR_CHECKING = False
 from OpenGL.GL import *
@@ -39,35 +40,80 @@ class Agent(object):
     def __init__(self, bzrc):
         self.bzrc = bzrc
         self.constants = self.bzrc.get_constants()
+        self.occ_size = 100
+        self.goal_time = 12
         self.commands = []
-        self.starting_prob = 0.5
+        self.goal_data = []
+        self.starting_prob = 0.75
         self.grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
         self.grid.fill(self.starting_prob)
-        # self.init_window(800,800)
+        self.init_window(800,800)
         print self.constants
 
     def tick(self, time_diff):
+        print time_diff
         """Some time has passed; decide what to do next."""
 
-        print self.bzrc.get_occgrid(0)
-        #self.update_grid(self.grid)
-        #self.draw_grid()
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
-        self.othertanks = othertanks
-        self.flags = flags
-        self.shots = shots
-        self.enemies = [tank for tank in othertanks if tank.color !=
-                        self.constants['team']]
+        if len(self.goal_data) == 0:
+            for tank in self.mytanks:
+                self.goal_data.append((1, (random.randrange(800) + 1 - 400, random.randrange(800) + 1 - 400)))
+        else:
+            for tank in self.mytanks:
+                if self.goal_data[tank.index][0] * self.goal_time < time_diff:
+                    edgeValue = -400 if (random.randrange(1)) == 1 else 400
+                    if random.randrange(1) == 1:
+                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (edgeValue, random.randrange(800) + 1 - 400))
+                    else:
+                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (random.randrange(800) + 1 - 400, edgeValue))
+        # Don't need these
+
+        # self.othertanks = othertanks
+        # self.flags = flags
+        # self.shots = shots
+        # self.enemies = [tank for tank in othertanks if tank.color !=
+        #                 self.constants['team']]
 
         self.commands = []
 
         for tank in mytanks:
-            self.attack_enemies(tank)
+            self.explore_grid(tank)
+            # self.attack_enemies(tank)
+
+        self.update_grid(self.grid)
+        self.draw_grid()
 
         results = self.bzrc.do_commands(self.commands)
 
     def explore_grid(self, tank):
+        # mytank [index] [callsign] [status] [shots available] [time to reload] [flag] [x] [y] [angle] [vx] [vy] [angvel]
+        truePos = float(self.constants['truepositive'])
+        trueNeg = float(self.constants['truenegative'])
+        world_size = int(self.constants['worldsize'])
+        print str(tank.index)
+        tank_pos, sensor = self.bzrc.get_occgrid(tank.index)
+
+        # Grid Filter Madness
+        for x in range(0, len(sensor)):
+            for y in range(0, len(sensor[x])):
+                worldX = tank_pos[0] + (world_size / 2) - (self.occ_size / 2) + x
+                worldY = tank_pos[1] + (world_size / 2) - (self.occ_size / 2) + y
+                if worldX >= world_size or worldX < 0 or worldY >= world_size or worldY < 0:
+                    continue
+                if sensor[x][y] == 1: # draw black ( need to eeequal zero)
+                    bel_occ = truePos * (1 - self.grid[worldY][worldX])
+                    bel_unocc = trueNeg * self.grid[worldY][worldX]
+                    self.grid[worldY][worldX] = (bel_occ / (bel_occ + bel_unocc))
+                else: # draw white
+                    bel_occ = (1-truePos) * (1 - self.grid[worldY][worldX])
+                    bel_unocc = (1-trueNeg) * self.grid[worldY][worldX]
+                    self.grid[worldY][worldX] = (bel_occ / (bel_occ + bel_unocc))
+
+        # move tank
+            posX = self.goal_data[tank.index][1][0]
+            posY = self.goal_data[tank.index][1][1]
+            self.move_to_position(tank, posX, posY)
         return
 
     def attack_enemies(self, tank):
@@ -92,7 +138,7 @@ class Agent(object):
         target_angle = math.atan2(target_y - tank.y,
                                   target_x - tank.x)
         relative_angle = self.normalize_angle(target_angle - tank.angle)
-        command = Command(tank.index, 1, 2 * relative_angle, True)
+        command = Command(tank.index, 1, 2 * relative_angle, False)
         self.commands.append(command)
 
     def normalize_angle(self, angle):
