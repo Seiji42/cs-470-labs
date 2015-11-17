@@ -16,12 +16,12 @@ class DepthFirstSearch(GraphSearch):
         came_from = {}
         while stack:
             if self.plot:
-                self.plot_graph(stack, discovered, "DepthFirstSearch")
+                self.plot_graph(stack, discovered, came_from, "DepthFirstSearch")
             curr_node = stack.pop(0)
             if curr_node == goal:
                 discovered.add(curr_node)
                 if self.plot:
-                    self.plot_graph(stack, discovered, "DepthFirstSearch")
+                    self.plot_graph(stack, discovered, came_from, "DepthFirstSearch")
                 return self.rebuild_path(came_from, curr_node)
             if curr_node not in discovered:
                 discovered.add(curr_node)

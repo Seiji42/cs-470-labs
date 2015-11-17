@@ -44,14 +44,17 @@ class Agent(object):
         self.goal_time = 12
         self.commands = []
         self.goal_data = []
-        self.starting_prob = 0.75
+        self.starting_prob = 0.2
         self.grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
         self.grid.fill(self.starting_prob)
+        self.test_grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
+        self.test_grid.fill(self.starting_prob)
         self.init_window(800,800)
+        self.flag = True
         print self.constants
 
     def tick(self, time_diff):
-        print time_diff
+        #print time_diff
         """Some time has passed; decide what to do next."""
 
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
@@ -79,6 +82,7 @@ class Agent(object):
 
         for tank in mytanks:
             self.explore_grid(tank)
+        #print self.grid
             # self.attack_enemies(tank)
 
         self.update_grid(self.grid)
@@ -91,24 +95,28 @@ class Agent(object):
         truePos = float(self.constants['truepositive'])
         trueNeg = float(self.constants['truenegative'])
         world_size = int(self.constants['worldsize'])
-        print str(tank.index)
+        #print str(tank.index)
         tank_pos, sensor = self.bzrc.get_occgrid(tank.index)
-
+        sensor_size = 100#int(self.constants["occ_grid"])
         # Grid Filter Madness
         for x in range(0, len(sensor)):
-            for y in range(0, len(sensor[x])):
+            for y in range(0, len(sensor[0])):
                 worldX = tank_pos[0] + (world_size / 2) - (self.occ_size / 2) + x
                 worldY = tank_pos[1] + (world_size / 2) - (self.occ_size / 2) + y
+
+                #print "x,y: %d,%d pos: %d,%d world: %d,%d" % (x,y,tank_pos[0],tank_pos[1],worldX,worldY)
+
                 if worldX >= world_size or worldX < 0 or worldY >= world_size or worldY < 0:
                     continue
-                if sensor[x][y] == 1: # draw black ( need to eeequal zero)
+                if sensor[x][y] == 1: # draw black ( need to equal zero)
                     bel_occ = truePos * (1 - self.grid[worldY][worldX])
-                    bel_unocc = trueNeg * self.grid[worldY][worldX]
-                    self.grid[worldY][worldX] = (bel_occ / (bel_occ + bel_unocc))
+                    bel_unocc = (1-trueNeg) * self.grid[worldY][worldX]
+                    self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
+
                 else: # draw white
                     bel_occ = (1-truePos) * (1 - self.grid[worldY][worldX])
-                    bel_unocc = (1-trueNeg) * self.grid[worldY][worldX]
-                    self.grid[worldY][worldX] = (bel_occ / (bel_occ + bel_unocc))
+                    bel_unocc = trueNeg * self.grid[worldY][worldX]
+                    self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
 
         # move tank
             posX = self.goal_data[tank.index][1][0]
@@ -160,7 +168,10 @@ class Agent(object):
 
     def update_grid(self, new_grid):
         global grid
-        self.grid = new_grid
+        #for y in range(0,800):
+            #for x in range(0,800):
+                #self.grid[y][x] = 1 - self.test_grid[y][x]
+        #self.grid = new_grid
 
     def init_window(self, width, height):
         global window

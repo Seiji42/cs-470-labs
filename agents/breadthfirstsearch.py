@@ -18,12 +18,12 @@ class BreadthFirstSearch(GraphSearch):
         came_from = {}
         while q:
             if self.plot:
-                self.plot_graph(q_set, discovered, "BreadthFirstSearch")
+                self.plot_graph(q_set, discovered, came_from, "BreadthFirstSearch")
             curr_node = q.pop(0)
             if curr_node == goal:
                 discovered.add(goal)
                 if self.plot:
-                    self.plot_graph(q_set, discovered, "BreadthFirstSearch")
+                    self.plot_graph(q_set, discovered, came_from, "BreadthFirstSearch")
                 return self.rebuild_path(came_from, curr_node)
             if curr_node not in discovered:
                 discovered.add(curr_node)

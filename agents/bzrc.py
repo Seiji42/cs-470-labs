@@ -166,6 +166,7 @@ class BZRC:
             return None
         pos = tuple(int(a) for a in self.expect('at')[0].split(','))
         size = tuple(int(a) for a in self.expect('size')[0].split('x'))
+        #print size
         grid = [[0 for i in range(size[1])] for j in range(size[0])]
         for x in range(size[0]):
             line = self.read_arr()[0]

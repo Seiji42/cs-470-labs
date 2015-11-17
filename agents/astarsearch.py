@@ -23,13 +23,13 @@ class AStarSearch(GraphSearch):
 
         while not frontier.empty():
             if self.plot:
-                self.plot_graph(frontier_set, explored, "AStarSearch")
+                self.plot_graph(frontier_set, explored, came_from, "AStarSearch")
             curr_node = frontier.get()[2]
             frontier_set.remove(curr_node)
             if curr_node == goal:
                 explored.add(curr_node)
                 if self.plot:
-                    self.plot_graph(frontier_set, explored, "AStarSearch")
+                    self.plot_graph(frontier_set, explored, came_from, "AStarSearch")
                 return self.rebuild_path(came_from, goal)
             explored.add(curr_node)
 

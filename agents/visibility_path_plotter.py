@@ -36,10 +36,10 @@ def plot_path(path, ax):
     return s
 
 def plot_goal(goal):
-    plt.plot([goal[0]], [goal[1]], 'gv')
+    plt.plot([goal[0]], [goal[1]], 'gv', ms=10)
     return
 def plot_position(position):
-    plt.plot([position[0]], [position[1]], 'ro')
+    plt.plot([position[0]], [position[1]], 'ro', ms=10)
     return
 
 if __name__ == '__main__':
@@ -47,10 +47,13 @@ if __name__ == '__main__':
     PORT = sys.argv[1]
     bzrc = BZRC(HOST, int(PORT))
     search = AStarSearch(True)
+    title = 'A* Search'
     if sys.argv[2] == 'b':
         search = BreadthFirstSearch(True)
+        title = "Breadth First Search"
     elif sys.argv[2] == 'd':
         search = DepthFirstSearch(True)
+        title = "Depth First Search"
     elif sys.argv[2] != 'a':
         print "You must enter a search type: [a]star, [b]readth first, [d]epth first"
 
@@ -62,4 +65,5 @@ if __name__ == '__main__':
     plot_path(agent.path, ax)
     plot_goal(agent.goal)
     plot_position(agent.position)
+    plt.title(title)
     plt.show()
