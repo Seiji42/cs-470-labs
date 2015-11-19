@@ -24,6 +24,7 @@ import sys
 import math
 import time
 import random
+import operator
 import OpenGL
 OpenGL.ERROR_CHECKING = False
 from OpenGL.GL import *
@@ -67,36 +68,11 @@ class Agent(object):
 
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
-        # if not self.goal_data:
-        #     for tank in self.mytanks:
-        #         randX = random.randint(0,8) * 100 - 400 + random.randint(0,100)
-        #         randY = random.randint(0,8) * 100 - 400 + random.randint(0,100)
-        #         self.goal_data[tank.index] = (1, (randX, randY))
-        # else:
-        #     for tank in self.mytanks:
-        #         xdiff = self.goal_data[tank.index][1][0] - tank.x
-        #         ydiff = self.goal_data[tank.index][1][1] - tank.y
-        #         if self.goal_data[tank.index][0] * self.goal_time < time_diff or xdiff ** 2 + ydiff ** 2 <= self.goal_radius ** 2:
-        #             randX = random.randint(0,8) * 100 - 400 + random.randint(0,100)
-        #             randY = random.randint(0,8) * 100 - 400 + random.randint(0,100)
-        #             if random.randrange(1) == 1:
-        #                 self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
-        #             else:
-        #                 self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
-        # Don't need these
-
-        # self.othertanks = othertanks
-        # self.flags = flags
-        # self.shots = shots
-        # self.enemies = [tank for tank in othertanks if tank.color !=
-        #                 self.constants['team']]
 
         self.commands = []
 
         for tank in mytanks:
             self.explore_grid(tank)
-        #print self.grid
-            # self.attack_enemies(tank)
 
         self.update_grid(self.grid)
         self.draw_grid()
@@ -108,25 +84,20 @@ class Agent(object):
         truePos = float(self.constants['truepositive'])
         trueNeg = float(self.constants['truenegative'])
 
-        #print str(tank.index)
         sensor_top_left, sensor_grid = self.bzrc.get_occgrid(tank.index)
 
         translated_top_left = (sensor_top_left[0] + (self.world_size / 2), sensor_top_left[1] + (self.world_size / 2))
 
-        #sensor_size = 100#int(self.constants["occ_grid"])
         # Grid Filter Madness
         for x in range(0, len(sensor_grid)):
             for y in range(0, len(sensor_grid[0])):
                 worldX = translated_top_left[0] + x
                 worldY = translated_top_left[1] + y
 
-                #print "x,y: %d,%d pos: %d,%d world: %d,%d" % (x,y,tank_pos[0],tank_pos[1],worldX,worldY)
-
                 if sensor_grid[x][y] == 1.0: # draw black ( need to equal zero)
                     bel_occ = truePos * (1.0 - self.grid[worldY][worldX])
                     bel_unocc = (1.0 - trueNeg) * self.grid[worldY][worldX]
                     self.grid[worldY][worldX] = 1.0 - (bel_occ / (bel_occ + bel_unocc))
-
                 else: # draw white
                     bel_occ = (1.0 - truePos) * (1.0 - self.grid[worldY][worldX])
                     bel_unocc = trueNeg * self.grid[worldY][worldX]
@@ -150,65 +121,87 @@ class Agent(object):
                 elif self.grid[worldY][worldX] >= self.assume_free:
                     self.grid[worldY][worldX] = 1.0
 
-        # move tank
-            if tank.index not in self.goal_data.keys():
-                self.goal_data[tank.index] = self.decide_goal(tank, sensor_top_left, len(sensor_grid) - 1, len(sensor_grid[0]) - 1)
-            elif self.dist(tank.x - self.goal_data[tank.index][0], tank.y - self.goal_data[tank.index][1]) < 30:
-                print "new goal"
-                self.goal_data[tank.index] = self.decide_goal(tank, sensor_top_left, len(sensor_grid) - 1, len(sensor_grid[0]) - 1)
-            print str(tank.x) +","+str(tank.y)+ "< "+str(self.goal_data[tank.index])
-
-            posX = self.goal_data[tank.index][0]
-            posY = self.goal_data[tank.index][1]
-            self.move_to_position(tank, posX, posY)
+        posX, posY = self.get_goal(tank)
+        self.move_to_position(tank, posX, posY)
         return
 
-    def decide_goal(self, tank, top_left, width, height):
-        beyond = 10
-        print top_left
-        print width
-        print height
-        left = top_left[0] + self.world_size / 2 - beyond
-        if left < 0:
-            left = 0
-        if left >= self.world_size:
-            left = self.world_size - 1
+    def get_goal(self, tank):
+        scale = 50
 
-        right = top_left[0] + width + self.world_size / 2 + beyond
-        if right < 0:
-            right = 0
-        if right >= self.world_size:
-            right = self.world_size - 1
+        print (tank.x)
+        print (tank.y)
+        point_to_check = (int(scale * math.cos(tank.angle) + tank.x), int(scale * math.sin(tank.angle) + tank.y))
 
-        top = top_left[1] + self.world_size / 2  - beyond
-        if top < 0:
-            top = 0
-        if top >= self.world_size:
-            top = self.world_size - 1
+        print(point_to_check)
 
-        bottom = top_left[1] + height + self.world_size / 2  + beyond
-        if bottom < 0:
-            bottom = 0
-        if bottom >= self.world_size:
-            bottom = self.world_size - 1
+        if self.check_point(point_to_check) != None:
+            return point_to_check
 
-        center_h = top_left[0] + self.world_size / 2 + width / 2
-        center_v = top_left[1] + self.world_size / 2 + height / 2
-        points = [(left, top),(left, center_v),(left, bottom),(right, top),(right, center_v),(right, bottom),(center_h, top),(center_h, bottom)]
-        random.shuffle(points)
-        print points
+        print "getting new goal"
+        for i in range(4, 2):
+            pos_ang = (int(scale * math.cos(tank.angle + math.pi / i) + tank.x), int(scale * math.sin(tank.angle + math.pi / i) + tank.y))
+            print "positive"
+            if self.check_point(pos_ang) != None:
+                return pos_ang
+            neg_ang = (int(scale * math.cos(tank.angle - math.pi / i) + tank.x), int(scale * math.sin(tank.angle - math.pi / i) + tank.y))
+            print "negative"
+            if self.check_point(neg_ang) != None:
+                return neg_ang
 
-        best_point = None
-        for point in points:
-            if best_point == None:
-                best_point = point
-            elif self.grid[best_point[1]][best_point[0]] == 0.0:
-                best_point = point
-            elif self.grid[best_point[1]][best_point[0]] == 1.0 and self.grid[point[1]][point[0]] > 0.0:
-                best_point = point
-            elif math.fabs(self.starting_prob - self.grid[point[1]][point[0]]) < math.fabs(self.starting_prob - self.grid[best_point[1]][best_point[0]]):
-                best_point = point
-        return (best_point[0] - self.world_size / 2, best_point[1] - self.world_size / 2)
+        for i in range(2, 4):
+            pos_ang = (int(scale * math.cos(tank.angle + math.pi * (i - 1)/ i) + tank.x), int(scale * math.sin(tank.angle + math.pi * (i - 1) / i) + tank.y))
+            print "positive"
+            if self.check_point(pos_ang) != None:
+                return pos_ang
+            neg_ang = (int(scale * math.cos(tank.angle - math.pi * (i - 1) / i) + tank.x), int(scale * math.sin(tank.angle - math.pi * (i - 1) / i) + tank.y))
+            print "negative"
+            if self.check_point(neg_ang) != None:
+                return neg_ang
+        #need default value to return
+
+    def check_point(self, point) :
+        average_grid_size = 10
+        if point[0] < 400 and point[0] > -400 and point[1] < 400 and point[1] > -400 and self.get_average((point[0] + self.world_size / 2, point[1] + self.world_size / 2), average_grid_size) > self.assume_obstacle:
+            return point
+        else:
+            print "need goal"
+            return None
+
+    def get_average(self, point, grid_size):
+        """
+        move point to be top left of grid
+        if topleft of grid is out of self.grid
+            get modified grid_width and grid_height
+            and move top_left to be in self.grid
+        while in grid
+            calculate average
+        return average
+        """
+        width = grid_size
+        height = grid_size
+        corner = {
+            'x':point[0] - grid_size / 2,
+            'y':point[1] - grid_size / 2
+        }
+        if (corner['x'] < 0):
+            width = grid_size + corner['x']
+            corner['x'] = 0
+        if (corner['y'] < 0):
+            height = grid_size + corner['y']
+            corner['y'] = 0
+        count = 0.0
+        total = 0.0
+        x_edge = self.world_size if corner['x'] + width > self.world_size else corner['x'] + width
+        y_edge = self.world_size if corner['y'] + height > self.world_size else corner['y'] + height
+        x = corner['x']
+        while x < x_edge:
+            y = corner['y']
+            while y < y_edge:
+                total += self.grid[y][x]
+                count += 1.0
+                y += 1.0
+            x += 1.0
+        return total / count
 
     def dist(self, x, y):
 		return math.sqrt(x * x + y * y)
