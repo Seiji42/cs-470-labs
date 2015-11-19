@@ -40,10 +40,10 @@ class Agent(object):
     def __init__(self, bzrc):
         self.bzrc = bzrc
         self.constants = self.bzrc.get_constants()
-        self.occ_size = 100
+        self.occ_size = 50
         self.goal_time = 12
         self.commands = []
-        self.goal_data = []
+        self.goal_data = {}
         self.starting_prob = 0.2
         self.grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
         self.grid.fill(self.starting_prob)
@@ -56,6 +56,9 @@ class Agent(object):
         self.not_occ_threshold = 0.75
         self.goal_radius = 50
         self.look_around_boost = 0.5
+
+        self.assume_obstacle = 0.05
+        self.assume_free = 0.95
         print self.constants
 
     def tick(self, time_diff):
@@ -64,22 +67,22 @@ class Agent(object):
 
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
-        if len(self.goal_data) == 0:
-            for tank in self.mytanks:
-                randX = random.randrange(8) * 100 - 400 + random.randrange(100)
-                randY = random.randrange(8) * 100 - 400 + random.randrange(100)
-                self.goal_data.append((1, (randX, randY)))
-        else:
-            for tank in self.mytanks:
-                xdiff = self.goal_data[tank.index][1][0] - tank.x
-                ydiff = self.goal_data[tank.index][1][1] - tank.y
-                if self.goal_data[tank.index][0] * self.goal_time < time_diff or xdiff ** 2 + ydiff ** 2 <= self.goal_radius ** 2:
-                    randX = random.randrange(8) * 100 - 400 + random.randrange(100)
-                    randY = random.randrange(8) * 100 - 400 + random.randrange(100)
-                    if random.randrange(1) == 1:
-                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
-                    else:
-                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
+        # if not self.goal_data:
+        #     for tank in self.mytanks:
+        #         randX = random.randint(0,8) * 100 - 400 + random.randint(0,100)
+        #         randY = random.randint(0,8) * 100 - 400 + random.randint(0,100)
+        #         self.goal_data[tank.index] = (1, (randX, randY))
+        # else:
+        #     for tank in self.mytanks:
+        #         xdiff = self.goal_data[tank.index][1][0] - tank.x
+        #         ydiff = self.goal_data[tank.index][1][1] - tank.y
+        #         if self.goal_data[tank.index][0] * self.goal_time < time_diff or xdiff ** 2 + ydiff ** 2 <= self.goal_radius ** 2:
+        #             randX = random.randint(0,8) * 100 - 400 + random.randint(0,100)
+        #             randY = random.randint(0,8) * 100 - 400 + random.randint(0,100)
+        #             if random.randrange(1) == 1:
+        #                 self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
+        #             else:
+        #                 self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
         # Don't need these
 
         # self.othertanks = othertanks
@@ -106,49 +109,109 @@ class Agent(object):
         trueNeg = float(self.constants['truenegative'])
 
         #print str(tank.index)
-        tank_pos, sensor = self.bzrc.get_occgrid(tank.index)
+        sensor_top_left, sensor_grid = self.bzrc.get_occgrid(tank.index)
+
+        translated_top_left = (sensor_top_left[0] + (self.world_size / 2), sensor_top_left[1] + (self.world_size / 2))
+
         #sensor_size = 100#int(self.constants["occ_grid"])
         # Grid Filter Madness
-        for x in range(0, len(sensor)):
-            for y in range(0, len(sensor[0])):
-                worldX = tank_pos[0] + (self.world_size / 2) - (self.occ_size / 2) + x
-                worldY = tank_pos[1] + (self.world_size / 2) - (self.occ_size / 2) + y
+        for x in range(0, len(sensor_grid)):
+            for y in range(0, len(sensor_grid[0])):
+                worldX = translated_top_left[0] + x
+                worldY = translated_top_left[1] + y
 
                 #print "x,y: %d,%d pos: %d,%d world: %d,%d" % (x,y,tank_pos[0],tank_pos[1],worldX,worldY)
 
-                if worldX >= self.world_size or worldX < 0 or worldY >= self.world_size or worldY < 0:
-                    continue
-
-                look_around_val = self.look_around_cell(x, y, sensor)
-                if sensor[x][y] == 1: # draw black ( need to equal zero)
-                    bel_occ = truePos * (1 - self.grid[worldY][worldX])
-                    bel_unocc = (1-trueNeg) * self.grid[worldY][worldX]
-
-                    #Look around cell
-                    self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
-
+                if sensor_grid[x][y] == 1.0: # draw black ( need to equal zero)
+                    bel_occ = truePos * (1.0 - self.grid[worldY][worldX])
+                    bel_unocc = (1.0 - trueNeg) * self.grid[worldY][worldX]
+                    self.grid[worldY][worldX] = 1.0 - (bel_occ / (bel_occ + bel_unocc))
 
                 else: # draw white
-                    bel_occ = (1-truePos) * (1 - self.grid[worldY][worldX])
+                    bel_occ = (1.0 - truePos) * (1.0 - self.grid[worldY][worldX])
                     bel_unocc = trueNeg * self.grid[worldY][worldX]
-                    self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
+                    self.grid[worldY][worldX] = 1.0 - (bel_occ / (bel_occ + bel_unocc))
 
+                #Look around cell
+                look_around_val = self.look_around_cell(x, y, sensor_grid)
                 if look_around_val[1] >= self.occ_threshold:
                     #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[1]
                     self.grid[worldY][worldX] -= self.look_around_boost
-                    if self.grid[worldY][worldX] < 0:
-                        self.grid[worldY][worldX] = 0
+                    if self.grid[worldY][worldX] < 0.0:
+                        self.grid[worldY][worldX] = 0.0
                 elif look_around_val[0] >= self.not_occ_threshold:
                     #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[0]
                     self.grid[worldY][worldX] += self.look_around_boost
-                    if self.grid[worldY][worldX] > 1:
-                        self.grid[worldY][worldX] = 1
+                    if self.grid[worldY][worldX] > 1.0:
+                        self.grid[worldY][worldX] = 1.0
+
+                if self.grid[worldY][worldX] <= self.assume_obstacle:
+                    self.grid[worldY][worldX] = 0.0
+                elif self.grid[worldY][worldX] >= self.assume_free:
+                    self.grid[worldY][worldX] = 1.0
 
         # move tank
-            posX = self.goal_data[tank.index][1][0]
-            posY = self.goal_data[tank.index][1][1]
+            if tank.index not in self.goal_data.keys():
+                self.goal_data[tank.index] = self.decide_goal(tank, sensor_top_left, len(sensor_grid) - 1, len(sensor_grid[0]) - 1)
+            elif self.dist(tank.x - self.goal_data[tank.index][0], tank.y - self.goal_data[tank.index][1]) < 30:
+                print "new goal"
+                self.goal_data[tank.index] = self.decide_goal(tank, sensor_top_left, len(sensor_grid) - 1, len(sensor_grid[0]) - 1)
+            print str(tank.x) +","+str(tank.y)+ "< "+str(self.goal_data[tank.index])
+
+            posX = self.goal_data[tank.index][0]
+            posY = self.goal_data[tank.index][1]
             self.move_to_position(tank, posX, posY)
         return
+
+    def decide_goal(self, tank, top_left, width, height):
+        beyond = 10
+        print top_left
+        print width
+        print height
+        left = top_left[0] + self.world_size / 2 - beyond
+        if left < 0:
+            left = 0
+        if left >= self.world_size:
+            left = self.world_size - 1
+
+        right = top_left[0] + width + self.world_size / 2 + beyond
+        if right < 0:
+            right = 0
+        if right >= self.world_size:
+            right = self.world_size - 1
+
+        top = top_left[1] + self.world_size / 2  - beyond
+        if top < 0:
+            top = 0
+        if top >= self.world_size:
+            top = self.world_size - 1
+
+        bottom = top_left[1] + height + self.world_size / 2  + beyond
+        if bottom < 0:
+            bottom = 0
+        if bottom >= self.world_size:
+            bottom = self.world_size - 1
+
+        center_h = top_left[0] + self.world_size / 2 + width / 2
+        center_v = top_left[1] + self.world_size / 2 + height / 2
+        points = [(left, top),(left, center_v),(left, bottom),(right, top),(right, center_v),(right, bottom),(center_h, top),(center_h, bottom)]
+        random.shuffle(points)
+        print points
+
+        best_point = None
+        for point in points:
+            if best_point == None:
+                best_point = point
+            elif self.grid[best_point[1]][best_point[0]] == 0.0:
+                best_point = point
+            elif self.grid[best_point[1]][best_point[0]] == 1.0 and self.grid[point[1]][point[0]] > 0.0:
+                best_point = point
+            elif math.fabs(self.starting_prob - self.grid[point[1]][point[0]]) < math.fabs(self.starting_prob - self.grid[best_point[1]][best_point[0]]):
+                best_point = point
+        return (best_point[0] - self.world_size / 2, best_point[1] - self.world_size / 2)
+
+    def dist(self, x, y):
+		return math.sqrt(x * x + y * y)
 
     def look_around_cell(self, x, y, sensor):
         ones = 0
