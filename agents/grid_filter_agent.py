@@ -51,6 +51,11 @@ class Agent(object):
         self.test_grid.fill(self.starting_prob)
         self.init_window(800,800)
         self.flag = True
+        self.world_size = world_size = int(self.constants['worldsize'])
+        self.occ_threshold = 0.75
+        self.not_occ_threshold = 0.75
+        self.goal_radius = 50
+        self.look_around_boost = 0.5
         print self.constants
 
     def tick(self, time_diff):
@@ -61,15 +66,20 @@ class Agent(object):
         self.mytanks = mytanks
         if len(self.goal_data) == 0:
             for tank in self.mytanks:
-                self.goal_data.append((1, (random.randrange(800) + 1 - 400, random.randrange(800) + 1 - 400)))
+                randX = random.randrange(8) * 100 - 400 + random.randrange(100)
+                randY = random.randrange(8) * 100 - 400 + random.randrange(100)
+                self.goal_data.append((1, (randX, randY)))
         else:
             for tank in self.mytanks:
-                if self.goal_data[tank.index][0] * self.goal_time < time_diff:
-                    edgeValue = -400 if (random.randrange(1)) == 1 else 400
+                xdiff = self.goal_data[tank.index][1][0] - tank.x
+                ydiff = self.goal_data[tank.index][1][1] - tank.y
+                if self.goal_data[tank.index][0] * self.goal_time < time_diff or xdiff ** 2 + ydiff ** 2 <= self.goal_radius ** 2:
+                    randX = random.randrange(8) * 100 - 400 + random.randrange(100)
+                    randY = random.randrange(8) * 100 - 400 + random.randrange(100)
                     if random.randrange(1) == 1:
-                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (edgeValue, random.randrange(800) + 1 - 400))
+                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
                     else:
-                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (random.randrange(800) + 1 - 400, edgeValue))
+                        self.goal_data[tank.index] = (self.goal_data[tank.index][0] + 1, (randX, randY))
         # Don't need these
 
         # self.othertanks = othertanks
@@ -94,35 +104,74 @@ class Agent(object):
         # mytank [index] [callsign] [status] [shots available] [time to reload] [flag] [x] [y] [angle] [vx] [vy] [angvel]
         truePos = float(self.constants['truepositive'])
         trueNeg = float(self.constants['truenegative'])
-        world_size = int(self.constants['worldsize'])
+
         #print str(tank.index)
         tank_pos, sensor = self.bzrc.get_occgrid(tank.index)
-        sensor_size = 100#int(self.constants["occ_grid"])
+        #sensor_size = 100#int(self.constants["occ_grid"])
         # Grid Filter Madness
         for x in range(0, len(sensor)):
             for y in range(0, len(sensor[0])):
-                worldX = tank_pos[0] + (world_size / 2) - (self.occ_size / 2) + x
-                worldY = tank_pos[1] + (world_size / 2) - (self.occ_size / 2) + y
+                worldX = tank_pos[0] + (self.world_size / 2) - (self.occ_size / 2) + x
+                worldY = tank_pos[1] + (self.world_size / 2) - (self.occ_size / 2) + y
 
                 #print "x,y: %d,%d pos: %d,%d world: %d,%d" % (x,y,tank_pos[0],tank_pos[1],worldX,worldY)
 
-                if worldX >= world_size or worldX < 0 or worldY >= world_size or worldY < 0:
+                if worldX >= self.world_size or worldX < 0 or worldY >= self.world_size or worldY < 0:
                     continue
+
+                look_around_val = self.look_around_cell(x, y, sensor)
                 if sensor[x][y] == 1: # draw black ( need to equal zero)
                     bel_occ = truePos * (1 - self.grid[worldY][worldX])
                     bel_unocc = (1-trueNeg) * self.grid[worldY][worldX]
+
+                    #Look around cell
                     self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
+
 
                 else: # draw white
                     bel_occ = (1-truePos) * (1 - self.grid[worldY][worldX])
                     bel_unocc = trueNeg * self.grid[worldY][worldX]
                     self.grid[worldY][worldX] = 1 - (bel_occ / (bel_occ + bel_unocc))
 
+                if look_around_val[1] >= self.occ_threshold:
+                    #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[1]
+                    self.grid[worldY][worldX] -= self.look_around_boost
+                    if self.grid[worldY][worldX] < 0:
+                        self.grid[worldY][worldX] = 0
+                elif look_around_val[0] >= self.not_occ_threshold:
+                    #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[0]
+                    self.grid[worldY][worldX] += self.look_around_boost
+                    if self.grid[worldY][worldX] > 1:
+                        self.grid[worldY][worldX] = 1
+
         # move tank
             posX = self.goal_data[tank.index][1][0]
             posY = self.goal_data[tank.index][1][1]
             self.move_to_position(tank, posX, posY)
         return
+
+    def look_around_cell(self, x, y, sensor):
+        ones = 0
+        zeros = 0
+        count = 0.0
+        for i in (-1,0,1):
+            for j in (-1,0,1):
+                if i == 0 and j == 0:
+                    continue
+                if self.cell_in_sensor(x + i, y + j, sensor):
+                    count += 1
+                    if sensor[x + i][y + j] == 1:
+                        ones += 1
+                    else:
+                        zeros += 1
+
+        return (zeros / count, ones / count)
+
+    def cell_in_map(self,x,y):
+        return x >= 0 and y >= 0 and x < self.world_size and y < self.world_size
+
+    def cell_in_sensor(self,x,y,sensor):
+        return x >= 0 and y >= 0 and x < len(sensor) and y < len(sensor[0])
 
     def attack_enemies(self, tank):
         """Find the closest enemy and chase it, shooting as you go."""
