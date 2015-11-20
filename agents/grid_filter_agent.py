@@ -105,12 +105,12 @@ class Agent(object):
 
                 #Look around cell
                 look_around_val = self.look_around_cell(x, y, sensor_grid)
-                if look_around_val[1] >= self.occ_threshold:
+                if look_around_val[1] >= self.not_occ_threshold:
                     #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[1]
                     self.grid[worldY][worldX] -= self.look_around_boost
                     if self.grid[worldY][worldX] < 0.0:
                         self.grid[worldY][worldX] = 0.0
-                elif look_around_val[0] >= self.not_occ_threshold:
+                elif look_around_val[0] >= self.occ_threshold:
                     #self.grid[worldY][worldX] = self.grid[worldY][worldX] * look_around_val[0]
                     self.grid[worldY][worldX] += self.look_around_boost
                     if self.grid[worldY][worldX] > 1.0:
@@ -126,57 +126,45 @@ class Agent(object):
         return
 
     def get_goal(self, tank):
-        scale = 50
+        scale = 15
 
-        print (tank.x)
-        print (tank.y)
+        print str(tank.index)
+        print
         point_to_check = (int(scale * math.cos(tank.angle) + tank.x), int(scale * math.sin(tank.angle) + tank.y))
 
-        print(point_to_check)
-
-        if self.check_point(point_to_check) != None:
+        if self.point_in_world(point_to_check):# and not self.point_in_obstacle(point_to_check):
             return point_to_check
 
         print "getting new goal"
-        for i in range(4, 2):
+        for i in range(6, 1):
             pos_ang = (int(scale * math.cos(tank.angle + math.pi / i) + tank.x), int(scale * math.sin(tank.angle + math.pi / i) + tank.y))
-            print "positive"
-            if self.check_point(pos_ang) != None:
+            print "positive" + str(pos_ang)
+            if self.point_in_world(pos_ang):# and not self.point_in_obstacle(pos_ang):
                 return pos_ang
             neg_ang = (int(scale * math.cos(tank.angle - math.pi / i) + tank.x), int(scale * math.sin(tank.angle - math.pi / i) + tank.y))
             print "negative"
-            if self.check_point(neg_ang) != None:
+            if self.point_in_world(neg_ang):# and not self.point_in_obstacle(neg_ang):
                 return neg_ang
 
-        for i in range(2, 4):
+        for i in range(3, 7):
             pos_ang = (int(scale * math.cos(tank.angle + math.pi * (i - 1)/ i) + tank.x), int(scale * math.sin(tank.angle + math.pi * (i - 1) / i) + tank.y))
-            print "positive"
-            if self.check_point(pos_ang) != None:
+            print "positive" + str(pos_ang)
+            if self.point_in_world(pos_ang):# and not self.point_in_obstacle(pos_ang):
                 return pos_ang
             neg_ang = (int(scale * math.cos(tank.angle - math.pi * (i - 1) / i) + tank.x), int(scale * math.sin(tank.angle - math.pi * (i - 1) / i) + tank.y))
             print "negative"
-            if self.check_point(neg_ang) != None:
+            if self.point_in_world(neg_ang):# and not self.point_in_obstacle(neg_ang):
                 return neg_ang
-        #need default value to return
+        return (int(scale * math.cos(tank.angle + math.pi) + tank.x), int(scale * math.sin(tank.angle + math.pi) + tank.y))
 
-    def check_point(self, point) :
+    def point_in_world(self, point):
+        return point[0] < 400 and point[0] > -400 and point[1] < 400 and point[1] > -400
+
+    def point_in_obstacle(self, point):
         average_grid_size = 10
-        if point[0] < 400 and point[0] > -400 and point[1] < 400 and point[1] > -400 and self.get_average((point[0] + self.world_size / 2, point[1] + self.world_size / 2), average_grid_size) > self.assume_obstacle:
-            return point
-        else:
-            print "need goal"
-            return None
+        return self.get_average((point[0] + self.world_size / 2, point[1] + self.world_size / 2), average_grid_size) > self.assume_obstacle
 
     def get_average(self, point, grid_size):
-        """
-        move point to be top left of grid
-        if topleft of grid is out of self.grid
-            get modified grid_width and grid_height
-            and move top_left to be in self.grid
-        while in grid
-            calculate average
-        return average
-        """
         width = grid_size
         height = grid_size
         corner = {
