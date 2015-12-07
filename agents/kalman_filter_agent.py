@@ -125,9 +125,14 @@ class Agent(object):
 
         self.commands = []
 
-        Z = np.zeros([2,1])
-        Z[0,0] = float(self.ticks)
-        Z[1,0] = float(self.ticks)
+        if len(othertanks) != 1:
+            print 'Must have only one enemy'
+            sys.exit(-1)
+
+        Z = np.zeros([2,1]) # get z from enemy tank
+        Z[0,0] = float(othertanks[0].x)
+        Z[1,0] = float(othertanks[0].y)
+
         self.update_kalman_filter(Z)
         self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
         #for tank in mytanks:

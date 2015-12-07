@@ -38,8 +38,9 @@ from bzrc import BZRC, Command
 class Agent(object):
     """Class handles all command and control logic for a teams tanks."""
 
-    def __init__(self, bzrc):
+    def __init__(self, bzrc, type):
         self.bzrc = bzrc
+        self.type = type
         self.constants = self.bzrc.get_constants()
         self.occ_size = 50
         self.goal_time = 12
@@ -72,10 +73,13 @@ class Agent(object):
         self.commands = []
 
         for tank in mytanks:
-            self.explore_grid(tank)
-
-        self.update_grid(self.grid)
-        self.draw_grid()
+            if self.type = 'line':
+                #do linear movement
+            elif self.type = 'wild':
+                #do wild pidgeon movement
+            else:
+                #don't move tank
+            # self.explore_grid(tank)
 
         results = self.bzrc.do_commands(self.commands)
 
@@ -297,7 +301,7 @@ class Agent(object):
 def main():
     # Process CLI arguments.
     try:
-        execname, host, port = sys.argv
+        execname, host, port, type = sys.argv
     except ValueError:
         execname = sys.argv[0]
         print >>sys.stderr, '%s: incorrect number of arguments' % execname
@@ -308,7 +312,7 @@ def main():
     #bzrc = BZRC(host, int(port), debug=True)
     bzrc = BZRC(host, int(port))
 
-    agent = Agent(bzrc)
+    agent = Agent(bzrc, type)
 
     prev_time = time.time()
 
