@@ -49,7 +49,7 @@ class Agent(object):
         self.friction = 0.1
 
         self.init_kalman_filter()
-        self.pl = plotter("kalman_plot_test.gpi")
+        self.pl = plotter("kalmanplots/plot")
         self.ticks = 0
 
         print self.constants
