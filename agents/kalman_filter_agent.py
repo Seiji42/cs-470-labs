@@ -25,11 +25,6 @@ import math
 import time
 import random
 import operator
-import OpenGL
-OpenGL.ERROR_CHECKING = False
-from OpenGL.GL import *
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
 
 from numpy.linalg import inv
 import numpy as np
@@ -46,33 +41,40 @@ class Agent(object):
         self.commands = []
 
         self.delta_t = 0.5
-        self.friction = 0.1
+        self.friction = 0
 
         self.init_kalman_filter()
-        self.pl = plotter("kalmanplots/plot")
+        self.pl = plotter()
         self.ticks = 0
+        self.update_time = 0
+        self.attack_state = "track"
+        self.look_ahead_steps = 16
+        self.target_loc = (0,0)
+        self.kalman_precision_wait = 4
+
+        self.mu_t = None
 
         print self.constants
 
     def init_kalman_filter(self):
-        self.x = np.zeros([6,1])
-        self.mu_t = np.zeros([6,1])
+
+        #self.mu_t = np.zeros([6,1])
 
         self.sigma_t = np.zeros([6,6])
-        self.sigma_t[0,0] = 100
-        self.sigma_t[1,1] = 0.1
-        self.sigma_t[2,2] = 0.1
-        self.sigma_t[3,3] = 100
-        self.sigma_t[4,4] = 0.1
-        self.sigma_t[5,5] = 0.1
+        self.sigma_t[0,0] = 10
+        self.sigma_t[1,1] = 10
+        self.sigma_t[2,2] = 10
+        self.sigma_t[3,3] = 10
+        self.sigma_t[4,4] = 10
+        self.sigma_t[5,5] = 10
 
         self.sigma_x = np.zeros([6,6])
-        self.sigma_x[0,0] = 0.1
-        self.sigma_x[1,1] = 0.1
-        self.sigma_x[2,2] = 100
-        self.sigma_x[3,3] = 0.1
-        self.sigma_x[4,4] = 0.1
-        self.sigma_x[5,5] = 100
+        self.sigma_x[0,0] = 10
+        self.sigma_x[1,1] = 10
+        self.sigma_x[2,2] = 10
+        self.sigma_x[3,3] = 10
+        self.sigma_x[4,4] = 10
+        self.sigma_x[5,5] = 10
 
         self.sigma_z = np.zeros([2,2])
         self.sigma_z[0,0] = 25
@@ -98,7 +100,7 @@ class Agent(object):
         self.update_mu_t(K, Z)
         print self.mu_t
         self.update_sigma_t(K)
-        print self.sigma_t
+        #print self.sigma_t
 
     def update_K_matrix(self):
         precalc = np.dot(np.add(np.dot(np.dot(self.F, self.sigma_t), self.F.transpose()), self.sigma_x), self.H.transpose())
@@ -123,22 +125,60 @@ class Agent(object):
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
 
+        if self.mu_t == None:
+            self.mu_t = np.zeros([6,1])
+            self.mu_t[0] = othertanks[0].x
+            self.mu_t[3] = othertanks[0].y
+
         self.commands = []
 
-        if len(othertanks) != 1:
-            print 'Must have only one enemy'
-            sys.exit(-1)
+        if time_diff >= self.update_time and othertanks[0].status != 'dead':
+            if len(othertanks) != 1:
+                print 'Must have only one enemy'
+                sys.exit(-1)
+            Z = np.zeros([2,1]) # get z from enemy tank
+            Z[0,0] = float(othertanks[0].x)
+            Z[1,0] = float(othertanks[0].y)
+            self.update_kalman_filter(Z)
+            self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
+            self.update_time += self.delta_t       
+        
+        self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
+        # if self.attack_state == 'track':
+            
+        #     if time_diff >= self.kalman_precision_wait:
+        #         self.attack_state = 'target'
+        #         target_mu = np.array(self.mu_t, copy=True)
 
-        Z = np.zeros([2,1]) # get z from enemy tank
-        Z[0,0] = float(othertanks[0].x)
-        Z[1,0] = float(othertanks[0].y)
+        #         for t in range(0, self.look_ahead_steps):
+        #             target_mu = np.dot(self.F, target_mu)
 
-        self.update_kalman_filter(Z)
-        self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
-        #for tank in mytanks:
+        #         self.target_loc = (target_mu[0], target_mu[3])
+        #         self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
+                
+        #         shotspeed = float(self.constants['shotspeed'])
+        #         dist = self.dist(mytanks[0].x - self.target_loc[0], mytanks[0].y - self.target_loc[1])
+
+        #         self.bullet_travel_time = dist / shotspeed
+        #         self.enemy_arrive_time = time_diff + self.look_ahead_steps * self.delta_t
+        #         self.fire_time = self.enemy_arrive_time - self.bullet_travel_time
+            
+        #     else:
+        #         self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
+
+        # elif self.attack_state == 'target':
+        #     if time_diff >= self.fire_time: 
+        #         command = Command(mytanks[0].index, 0, 0, True)
+        #         self.commands.append(command)
+        #         self.attack_state = ' '
+        #     else:
+        #         self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
+
+
 
         results = self.bzrc.do_commands(self.commands)
         self.ticks += 1
+
     def dist(self, x, y):
 		return math.sqrt(x * x + y * y)
 
@@ -147,13 +187,14 @@ class Agent(object):
         """Find the closest enemy and chase it, shooting as you go."""
         best_enemy = None
         best_dist = 2 * float(self.constants['worldsize'])
-        for enemy in self.enemies:
-            if enemy.status != 'alive':
-                continue
-            dist = math.sqrt((enemy.x - tank.x)**2 + (enemy.y - tank.y)**2)
-            if dist < best_dist:
-                best_dist = dist
-                best_enemy = enemy
+        # for enemy in self.enemies:
+        #     if enemy.status != 'alive':
+        #         continue
+        #     dist = math.sqrt((enemy.x - tank.x)**2 + (enemy.y - tank.y)**2)
+        #     if dist < best_dist:
+        #         best_dist = dist
+        #         best_enemy = enemy
+        best
         if best_enemy is None:
             command = Command(tank.index, 0, 0, False)
             self.commands.append(command)
@@ -165,7 +206,7 @@ class Agent(object):
         target_angle = math.atan2(target_y - tank.y,
                                   target_x - tank.x)
         relative_angle = self.normalize_angle(target_angle - tank.angle)
-        command = Command(tank.index, 1, 2 * relative_angle, False)
+        command = Command(tank.index, 0, 2 * relative_angle, True)
         self.commands.append(command)
 
     def normalize_angle(self, angle):
@@ -176,22 +217,6 @@ class Agent(object):
         elif angle > math.pi:
             angle -= 2 * math.pi
         return angle
-
-    def draw_grid(self):
-        # This assumes you are using a numpy array for your grid
-        width, height = self.grid.shape
-        glRasterPos2f(-1, -1)
-        glDrawPixels(width, height, GL_LUMINANCE, GL_FLOAT, self.grid)
-        glFlush()
-        glutSwapBuffers()
-
-    def update_grid(self, new_grid):
-        global grid
-        #for y in range(0,800):
-            #for x in range(0,800):
-                #self.grid[y][x] = 1 - self.test_grid[y][x]
-        #self.grid = new_grid
-
 
 def main():
     # Process CLI arguments.

@@ -24,12 +24,7 @@ import sys
 import math
 import time
 import random
-import operator
-import OpenGL
-OpenGL.ERROR_CHECKING = False
-from OpenGL.GL import *
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
+
 
 import numpy as np
 
@@ -42,25 +37,8 @@ class Agent(object):
         self.bzrc = bzrc
         self.type = type
         self.constants = self.bzrc.get_constants()
-        self.occ_size = 50
-        self.goal_time = 12
         self.commands = []
-        self.goal_data = {}
-        self.starting_prob = 0.2
-        self.grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
-        self.grid.fill(self.starting_prob)
-        self.test_grid = np.ones((int(self.constants['worldsize']), int(self.constants['worldsize'])))
-        self.test_grid.fill(self.starting_prob)
-        self.init_window(800,800)
-        self.flag = True
-        self.world_size = world_size = int(self.constants['worldsize'])
-        self.occ_threshold = 0.75
-        self.not_occ_threshold = 0.75
-        self.goal_radius = 50
-        self.look_around_boost = 0.5
 
-        self.assume_obstacle = 0.05
-        self.assume_free = 0.95
         print self.constants
 
     def tick(self, time_diff):
@@ -73,14 +51,13 @@ class Agent(object):
         self.commands = []
 
         for tank in mytanks:
-            if self.type = 'line':
-                #do linear movement
-            elif self.type = 'wild':
+            if self.type == 'line':
+                command = Command(tank.index, 1, 0, False)
+                self.commands.append(command)
+            elif self.type == 'wild':
+                x = 6
                 #do wild pidgeon movement
-            else:
-                #don't move tank
-            # self.explore_grid(tank)
-
+                # self.explore_grid(tank)
         results = self.bzrc.do_commands(self.commands)
 
     def explore_grid(self, tank):
@@ -267,35 +244,6 @@ class Agent(object):
             angle -= 2 * math.pi
         return angle
 
-    def draw_grid(self):
-        # This assumes you are using a numpy array for your grid
-        width, height = self.grid.shape
-        glRasterPos2f(-1, -1)
-        glDrawPixels(width, height, GL_LUMINANCE, GL_FLOAT, self.grid)
-        glFlush()
-        glutSwapBuffers()
-
-    def update_grid(self, new_grid):
-        global grid
-        #for y in range(0,800):
-            #for x in range(0,800):
-                #self.grid[y][x] = 1 - self.test_grid[y][x]
-        #self.grid = new_grid
-
-    def init_window(self, width, height):
-        global window
-        global grid
-        glutInit(())
-        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_ALPHA | GLUT_DEPTH)
-        glutInitWindowSize(width, height)
-        glutInitWindowPosition(0, 0)
-        window = glutCreateWindow("Grid filter")
-        glutDisplayFunc(self.draw_grid)
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
-        #glutMainLoop()
 
 
 def main():
