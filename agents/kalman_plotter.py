@@ -15,17 +15,6 @@ class GnuPlotter(object):
         f.write("unset key\n")
         f.write("set size square\n\n")
 
-<<<<<<< Updated upstream
-        # f.write("unset arrow\n")
-        # f.write("set arrow from 0, 0 to -150, 0 nohead front lt 3\n")
-        # f.write("set arrow from -150, 0 to -150, -50 nohead front lt 3\n")
-        # f.write("set arrow from -150, -50 to 0, -50 nohead front lt 3\n")
-        # f.write("set arrow from 0, -50 to 0, 0 nohead front lt 3\n")
-        # f.write("set arrow from 200, 100 to 200, 330 nohead front lt 3\n")
-        # f.write("set arrow from 200, 330 to 300, 330 nohead front lt 3\n")
-        # f.write("set arrow from 300, 330 to 300, 100 nohead front lt 3\n")
-        # f.write("set arrow from 300, 100 to 200, 100 nohead front lt 3\n")
-=======
         #f.write("unset arrow\n")
         #f.write("set arrow from 0, 0 to -150, 0 nohead front lt 3\n")
         #f.write("set arrow from -150, 0 to -150, -50 nohead front lt 3\n")
@@ -35,7 +24,6 @@ class GnuPlotter(object):
         #f.write("set arrow from 200, 330 to 300, 330 nohead front lt 3\n")
         #f.write("set arrow from 300, 330 to 300, 100 nohead front lt 3\n")
         #f.write("set arrow from 300, 100 to 200, 100 nohead front lt 3\n")
->>>>>>> Stashed changes
 
         f.write("set palette model RGB functions 1-gray, 1-gray, 1-gray\n")
         f.write("set isosamples 100\n")
