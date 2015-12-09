@@ -40,7 +40,7 @@ class Agent(object):
         self.constants = self.bzrc.get_constants()
         self.commands = []
 
-        self.delta_t = 0.5
+        self.delta_t = 0.25
         self.friction = 0
 
         self.init_kalman_filter()
@@ -48,9 +48,9 @@ class Agent(object):
         self.ticks = 0
         self.update_time = 0
         self.attack_state = "track"
-        self.look_ahead_steps = 16
+        self.look_ahead_steps = 40
         self.target_loc = (0,0)
-        self.kalman_precision_wait = 4
+        self.kalman_precision_wait = 6
 
         self.mu_t = None
 
@@ -61,24 +61,24 @@ class Agent(object):
         #self.mu_t = np.zeros([6,1])
 
         self.sigma_t = np.zeros([6,6])
-        self.sigma_t[0,0] = 10
-        self.sigma_t[1,1] = 10
-        self.sigma_t[2,2] = 10
-        self.sigma_t[3,3] = 10
-        self.sigma_t[4,4] = 10
-        self.sigma_t[5,5] = 10
+        self.sigma_t[0,0] = 5
+        self.sigma_t[1,1] = 5
+        self.sigma_t[2,2] = 0
+        self.sigma_t[3,3] = 5
+        self.sigma_t[4,4] = 5
+        self.sigma_t[5,5] = 0
 
         self.sigma_x = np.zeros([6,6])
-        self.sigma_x[0,0] = 10
-        self.sigma_x[1,1] = 10
-        self.sigma_x[2,2] = 10
-        self.sigma_x[3,3] = 10
-        self.sigma_x[4,4] = 10
-        self.sigma_x[5,5] = 10
+        self.sigma_x[0,0] = 0.1
+        self.sigma_x[1,1] = 0.1
+        self.sigma_x[2,2] = 100
+        self.sigma_x[3,3] = 0.1
+        self.sigma_x[4,4] = 0.1
+        self.sigma_x[5,5] = 100
 
         self.sigma_z = np.zeros([2,2])
-        self.sigma_z[0,0] = 25
-        self.sigma_z[1,1] = 25
+        self.sigma_z[0,0] = 1
+        self.sigma_z[1,1] = 1
 
         self.H = np.zeros([2,6])
         self.H[0,0] = 1
@@ -98,7 +98,7 @@ class Agent(object):
     def update_kalman_filter(self, Z):
         K = self.update_K_matrix()
         self.update_mu_t(K, Z)
-        print self.mu_t
+        #print self.mu_t
         self.update_sigma_t(K)
         #print self.sigma_t
 
@@ -121,7 +121,6 @@ class Agent(object):
     def tick(self, time_diff):
         #print time_diff
         """Some time has passed; decide what to do next."""
-
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
 
@@ -143,36 +142,46 @@ class Agent(object):
             self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
             self.update_time += self.delta_t       
         
-        self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
-        # if self.attack_state == 'track':
-            
-        #     if time_diff >= self.kalman_precision_wait:
-        #         self.attack_state = 'target'
-        #         target_mu = np.array(self.mu_t, copy=True)
+        #self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
+        if self.attack_state == 'track':
+            #print 'track'
+            if time_diff >= self.kalman_precision_wait:
+                self.attack_state = 'target'
+                target_mu = np.array(self.mu_t, copy=True)
 
-        #         for t in range(0, self.look_ahead_steps):
-        #             target_mu = np.dot(self.F, target_mu)
+                for t in range(0, self.look_ahead_steps):
+                    target_mu = np.dot(self.F, target_mu)
 
-        #         self.target_loc = (target_mu[0], target_mu[3])
-        #         self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
+                self.target_loc = (target_mu[0], target_mu[3])
+                self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
                 
-        #         shotspeed = float(self.constants['shotspeed'])
-        #         dist = self.dist(mytanks[0].x - self.target_loc[0], mytanks[0].y - self.target_loc[1])
+                shotspeed = float(self.constants['shotspeed'])
+                dist = self.dist(mytanks[0].x - self.target_loc[0], mytanks[0].y - self.target_loc[1])
 
-        #         self.bullet_travel_time = dist / shotspeed
-        #         self.enemy_arrive_time = time_diff + self.look_ahead_steps * self.delta_t
-        #         self.fire_time = self.enemy_arrive_time - self.bullet_travel_time
+                self.bullet_travel_time = dist / shotspeed
+                self.enemy_arrive_time = time_diff + self.look_ahead_steps * self.delta_t
+                self.fire_time = self.enemy_arrive_time - self.bullet_travel_time
+
+                print self.mu_t
+                print time_diff
+                print self.target_loc
+                print dist
+                print shotspeed
+                print self.bullet_travel_time
+                print self.enemy_arrive_time
+                print self.fire_time
             
-        #     else:
-        #         self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
+            else:
+                self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
 
-        # elif self.attack_state == 'target':
-        #     if time_diff >= self.fire_time: 
-        #         command = Command(mytanks[0].index, 0, 0, True)
-        #         self.commands.append(command)
-        #         self.attack_state = ' '
-        #     else:
-        #         self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
+        elif self.attack_state == 'target':
+            #print 'target'
+            if time_diff >= self.fire_time: 
+                command = Command(mytanks[0].index, 0, 0, True)
+                self.commands.append(command)
+                self.attack_state = ' '
+            else:
+                self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
 
 
 
