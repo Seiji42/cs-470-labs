@@ -24,6 +24,11 @@ class GnuPlotter(object):
 
     def plot(self,rho,sigma_x,sigma_y, x, y):
 
+        # print rho
+        # print sigma_x
+        # print sigma_y
+        # print x
+        # print y
         plot = ''
         plot += "sigma_x = %f\n" % sigma_x
         plot += "sigma_y = %f\n" % sigma_y

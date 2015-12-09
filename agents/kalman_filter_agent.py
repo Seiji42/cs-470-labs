@@ -40,7 +40,7 @@ class Agent(object):
         self.constants = self.bzrc.get_constants()
         self.commands = []
 
-        self.delta_t = 0.25
+        self.delta_t = 0.5
         self.friction = 0
 
         self.init_kalman_filter()
@@ -48,75 +48,83 @@ class Agent(object):
         self.ticks = 0
         self.update_time = 0
         self.attack_state = "track"
-        self.look_ahead_steps = 40
+        self.look_ahead_steps = 20.0
+        self.look_ahead_sec = 9.0
         self.target_loc = (0,0)
-        self.kalman_precision_wait = 6
-
+        self.kalman_precision_wait = 10.0
+        self.latency_adjustment = 0.0
         self.mu_t = None
+        self.dead_reset = False
 
         print self.constants
 
     def init_kalman_filter(self):
 
-        #self.mu_t = np.zeros([6,1])
 
-        self.sigma_t = np.zeros([6,6])
-        self.sigma_t[0,0] = 100
-        self.sigma_t[1,1] = 100
-        self.sigma_t[2,2] = 0
-        self.sigma_t[3,3] = 100
-        self.sigma_t[4,4] = 100
-        self.sigma_t[5,5] = 0
+        self.sigma_t = np.matrix('100.0 0 0 0 0 0;\
+                                  0 2.0 0 0 0 0;\
+                                  0 0 2.0 0 0 0;\
+                                  0 0 0 100.0 0 0;\
+                                  0 0 0 0 2.0 0;\
+                                  0 0 0 0 0 2.0')
 
-        self.sigma_x = np.zeros([6,6])
-        self.sigma_x[0,0] = 0.1
-        self.sigma_x[1,1] = 1
-        self.sigma_x[2,2] = 0
-        self.sigma_x[3,3] = 0.1
-        self.sigma_x[4,4] = 1
-        self.sigma_x[5,5] = 0
+        self.sigma_x = np.matrix('0.1 0 0 0 0 0;\
+                                  0 0.1 0 0 0 0;\
+                                  0 0 100.0 0 0 0;\
+                                  0 0 0 0.1 0 0;\
+                                  0 0 0 0 0.1 0;\
+                                  0 0 0 0 0 100.0')
 
-        self.sigma_z = np.zeros([2,2])
-        self.sigma_z[0,0] = 1
-        self.sigma_z[1,1] = 1
+        self.sigma_z = np.matrix('25.0 0;0 25.0');
 
-        self.H = np.zeros([2,6])
-        self.H[0,0] = 1
-        self.H[1,3] = 1
+        self.H = np.matrix('1.0 0 0 0 0 0;\
+                            0 0 0 1.0 0 0');
 
-        self.F = np.zeros([6,6])
-        np.fill_diagonal(self.F, 1)
-        self.F[0,1] = self.delta_t
-        self.F[0,2] = self.delta_t ** 2 / 2
-        self.F[1,2] = self.delta_t
-        self.F[3,4] = self.delta_t
-        self.F[4,5] = self.delta_t
-        self.F[3,5] = self.delta_t ** 2 / 2
-        self.F[2,1] = -self.friction
-        self.F[5,4] = -self.friction
+        self.HT = self.H.transpose()
+
+        self.F = self.create_F_matrix(self.delta_t)
+        self.FT = self.F.transpose();
+
+    def create_F_matrix(self, delta_t):
+        F = np.matrix('1.0 0 0 0 0 0;\
+                      0 1.0 0 0 0 0;\
+                      0 0 1.0 0 0 0;\
+                      0 0 0 1.0 0 0;\
+                      0 0 0 0 1.0 0;\
+                      0 0 0 0 0 1.0')
+        F[0,1] = delta_t
+        F[0,2] = (delta_t ** 2) / 2
+        F[1,2] = delta_t
+        F[3,4] = delta_t
+        F[4,5] = delta_t
+        F[3,5] = (delta_t ** 2) / 2
+        F[2,1] = self.friction
+        F[5,4] = -self.friction
+        return F
 
     def update_kalman_filter(self, Z):
         K = self.update_K_matrix()
+        #print K
         self.update_mu_t(K, Z)
-        #print self.mu_t
+        print self.mu_t
         self.update_sigma_t(K)
         #print self.sigma_t
 
     def update_K_matrix(self):
-        precalc = np.dot(np.add(np.dot(np.dot(self.F, self.sigma_t), self.F.transpose()), self.sigma_x), self.H.transpose())
-        precalc2 = inv(np.add(np.dot(self.H, precalc), self.sigma_z))
-        return np.dot(precalc, precalc2)
+        precalc = ((self.F * self.sigma_t * self.FT) + self.sigma_x) * self.HT
+        precalc2 = inv((self.H * precalc) + self.sigma_z)
+        return precalc * precalc2
 
     def update_mu_t(self, K, Z):
-        precalc = np.dot(self.F, self.mu_t)
-        precalc2 = np.dot(K, np.subtract(Z, np.dot(np.dot(self.H, self.F), self.mu_t)))
-        self.mu_t = np.add(precalc, precalc2)
+        precalc = self.F * self.mu_t
+        precalc2 = K * (Z - (self.H * self.F * self.mu_t))
+        self.mu_t = precalc + precalc2
 
     def update_sigma_t(self, K):
         I = np.identity(6)
-        precalc = np.subtract(I, np.dot(K, self.H))
-        precalc2 = np.add(np.dot(np.dot(self.F, self.sigma_t), self.F.transpose()), self.sigma_x)
-        self.sigma_t = np.dot(precalc, precalc2)
+        precalc = I - (K * self.H)
+        precalc2 = (self.F * self.sigma_t * self.FT) + self.sigma_x
+        self.sigma_t = precalc * precalc2
 
     def tick(self, time_diff):
         #print time_diff
@@ -124,69 +132,40 @@ class Agent(object):
         mytanks, othertanks, flags, shots = self.bzrc.get_lots_o_stuff()
         self.mytanks = mytanks
 
-        if self.mu_t == None:
-            self.mu_t = np.zeros([6,1])
-            self.mu_t[0] = othertanks[0].x
-            self.mu_t[3] = othertanks[0].y
+        if self.mu_t == None and othertanks[0].status != 'dead':
+            self.mu_t = np.matrix([[othertanks[0].x],[0],[0],[othertanks[0].y],[0],[0]])
+            #self.mu_t = np.matrix([[0],[0],[0],[0],[0],[0]])
+            self.dead_reset = False
 
         self.commands = []
 
+        if othertanks[0].status == 'dead' and not self.dead_reset:
+            self.mu_t = None
+            self.init_kalman_filter()
+            self.dead_reset = True
+
         if time_diff >= self.update_time and othertanks[0].status != 'dead':
+
             if len(othertanks) != 1:
                 print 'Must have only one enemy'
                 sys.exit(-1)
-            Z = np.zeros([2,1]) # get z from enemy tank
-            Z[0,0] = float(othertanks[0].x)
-            Z[1,0] = float(othertanks[0].y)
+            Z = np.matrix([[float(othertanks[0].x)],[float(othertanks[0].y)]])# get z from enemy tank
+            #Z = np.matrix([[0],[0]])
             self.update_kalman_filter(Z)
             self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
             self.update_time += self.delta_t       
+
+        if self.mu_t != None:
+            shotspeed = float(self.constants['shotspeed'])
+            dist = self.dist(mytanks[0].x - self.mu_t[0,0], mytanks[0].y - self.mu_t[3,0])
+            time = dist / shotspeed
+            F = self.create_F_matrix(time)
+            new_mu = F * self.mu_t
+            #print new_mu
+
+            self.move_to_position(mytanks[0], new_mu[0,0], new_mu[3,0])
         
-        #self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
-        if self.attack_state == 'track':
-            #print 'track'
-            if time_diff >= self.kalman_precision_wait:
-                self.attack_state = 'target'
-                target_mu = np.array(self.mu_t, copy=True)
-
-                for t in range(0, self.look_ahead_steps):
-                    target_mu = np.dot(self.F, target_mu)
-
-                self.target_loc = (target_mu[0], target_mu[3])
-                self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
-                
-                shotspeed = float(self.constants['shotspeed'])
-                dist = self.dist(mytanks[0].x - self.target_loc[0], mytanks[0].y - self.target_loc[1])
-
-                self.bullet_travel_time = dist / shotspeed
-                self.enemy_arrive_time = time_diff + self.look_ahead_steps * self.delta_t
-                self.fire_time = self.enemy_arrive_time - self.bullet_travel_time
-
-                print self.mu_t
-                print time_diff
-                print self.target_loc
-                print dist
-                print shotspeed
-                print self.bullet_travel_time
-                print self.enemy_arrive_time
-                print self.fire_time
-            
-            else:
-                self.move_to_position(mytanks[0], self.mu_t[0], self.mu_t[3])
-
-        elif self.attack_state == 'target':
-            #print 'target'
-            if time_diff >= self.fire_time: 
-                command = Command(mytanks[0].index, 0, 0, True)
-                self.commands.append(command)
-                self.attack_state = ' '
-            else:
-                self.move_to_position(mytanks[0], self.target_loc[0], self.target_loc[1])
-
-
-
         results = self.bzrc.do_commands(self.commands)
-        self.ticks += 1
 
     def dist(self, x, y):
 		return math.sqrt(x * x + y * y)
@@ -215,7 +194,10 @@ class Agent(object):
         target_angle = math.atan2(target_y - tank.y,
                                   target_x - tank.x)
         relative_angle = self.normalize_angle(target_angle - tank.angle)
-        command = Command(tank.index, 0, 2 * relative_angle, False)
+        if abs(relative_angle) <= 0.01:
+            command = Command(tank.index, 0, 2 * relative_angle, True)
+        else:
+            command = Command(tank.index, 0, 2 * relative_angle, False)
         self.commands.append(command)
 
     def normalize_angle(self, angle):

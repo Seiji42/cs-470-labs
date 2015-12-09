@@ -23,7 +23,7 @@
 import sys
 import math
 import time
-from random import randrange
+from random import randrange, uniform
 
 
 import numpy as np
@@ -38,6 +38,9 @@ class Agent(object):
         self.type = type
         self.constants = self.bzrc.get_constants()
         self.commands = []
+        self.goal_change_time = 2
+        self.update_time = 0
+        self.forward_velocity = 0.5
 
         self.pigeon_goal = None
 
@@ -49,26 +52,29 @@ class Agent(object):
 
         self.commands = []
 
+
         for tank in mytanks:
             if self.type == 'line':
-                command = Command(tank.index, 1, 0, False)
-                self.commands.append(command)
+                self.move_to_position(tank, 400, 400, 0.5, 0)
             elif self.type == 'wild':
+                if self.update_time < time_diff:
+                    self.update_time += 2
+                    self.forward_velocity = uniform(1, 0.25)
                 if self.pigeon_goal == None or self.dist(tank.x - self.pigeon_goal[0], tank.y - self.pigeon_goal[1]) < 10:
                     self.pigeon_goal = (randrange(-400, 401), randrange(-400, 401))
-                self.move_to_position(tank, self.pigeon_goal[0], self.pigeon_goal[1])
+                self.move_to_position(tank, self.pigeon_goal[0], self.pigeon_goal[1], self.forward_velocity, randrange(-30,30))
 
         results = self.bzrc.do_commands(self.commands)
 
     def dist(self, x, y):
 		return math.sqrt(x * x + y * y)
 
-    def move_to_position(self, tank, target_x, target_y):
+    def move_to_position(self, tank, target_x, target_y, speed, ang_noise):
         """Set command to move to given coordinates."""
         target_angle = math.atan2(target_y - tank.y,
                                   target_x - tank.x)
         relative_angle = self.normalize_angle(target_angle - tank.angle)
-        command = Command(tank.index, 1, 2 * relative_angle, False)
+        command = Command(tank.index, self.forward_velocity, 2 * relative_angle, False)
         self.commands.append(command)
 
     def normalize_angle(self, angle):
