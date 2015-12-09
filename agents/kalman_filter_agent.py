@@ -70,10 +70,10 @@ class Agent(object):
 
         self.sigma_x = np.matrix('0.1 0 0 0 0 0;\
                                   0 0.1 0 0 0 0;\
-                                  0 0 100.0 0 0 0;\
+                                  0 0 1 0 0 0;\
                                   0 0 0 0.1 0 0;\
                                   0 0 0 0 0.1 0;\
-                                  0 0 0 0 0 100.0')
+                                  0 0 0 0 0 1')
 
         self.sigma_z = np.matrix('25.0 0;0 25.0');
 
@@ -153,7 +153,7 @@ class Agent(object):
             #Z = np.matrix([[0],[0]])
             self.update_kalman_filter(Z)
             self.pl.plot(self.sigma_t[0,3], self.sigma_t[0,0], self.sigma_t[3,3], self.mu_t[0,0], self.mu_t[3,0])
-            self.update_time += self.delta_t       
+            self.update_time += self.delta_t
 
         if self.mu_t != None:
             shotspeed = float(self.constants['shotspeed'])
@@ -164,7 +164,7 @@ class Agent(object):
             #print new_mu
 
             self.move_to_position(mytanks[0], new_mu[0,0], new_mu[3,0])
-        
+
         results = self.bzrc.do_commands(self.commands)
 
     def dist(self, x, y):
