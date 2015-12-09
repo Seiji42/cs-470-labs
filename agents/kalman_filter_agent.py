@@ -61,20 +61,20 @@ class Agent(object):
         #self.mu_t = np.zeros([6,1])
 
         self.sigma_t = np.zeros([6,6])
-        self.sigma_t[0,0] = 5
-        self.sigma_t[1,1] = 5
+        self.sigma_t[0,0] = 100
+        self.sigma_t[1,1] = 100
         self.sigma_t[2,2] = 0
-        self.sigma_t[3,3] = 5
-        self.sigma_t[4,4] = 5
+        self.sigma_t[3,3] = 100
+        self.sigma_t[4,4] = 100
         self.sigma_t[5,5] = 0
 
         self.sigma_x = np.zeros([6,6])
         self.sigma_x[0,0] = 0.1
-        self.sigma_x[1,1] = 0.1
-        self.sigma_x[2,2] = 100
+        self.sigma_x[1,1] = 1
+        self.sigma_x[2,2] = 0
         self.sigma_x[3,3] = 0.1
-        self.sigma_x[4,4] = 0.1
-        self.sigma_x[5,5] = 100
+        self.sigma_x[4,4] = 1
+        self.sigma_x[5,5] = 0
 
         self.sigma_z = np.zeros([2,2])
         self.sigma_z[0,0] = 1
@@ -215,7 +215,7 @@ class Agent(object):
         target_angle = math.atan2(target_y - tank.y,
                                   target_x - tank.x)
         relative_angle = self.normalize_angle(target_angle - tank.angle)
-        command = Command(tank.index, 0, 2 * relative_angle, True)
+        command = Command(tank.index, 0, 2 * relative_angle, False)
         self.commands.append(command)
 
     def normalize_angle(self, angle):
